@@ -107,9 +107,9 @@ export default class Dybg {
 
     this.BLUR_PASSES = 8;
     this.covers = [
-      {px: 0.8, py: 0.4, angle: 4.7, speed: -0.002, scale: 1.7, warpPhase: 4, warpSpeed: 0.04},
+      {px: 0.8, py: 0.4, angle: 4.7, speed: -0.002, scale: 1.7, warpPhase: 3, warpSpeed: 0.04},
       {px: 0.3, py: 0.5, angle: 3.1, speed:  0.0015, scale: 1.5, warpPhase: 3.2, warpSpeed: 0.03},
-      {px: 0.6, py: 0.1, angle: 0.0, speed:  0.001, scale: 1.6, warpPhase: 2.9, warpSpeed: 0.015},
+      {px: 0.0, py: 0.78, angle: 0.0, speed:  0.001, scale: 1.8, warpPhase: 3.3, warpSpeed: 0.015},
     ];
     this.loaded = false;
     this.t = 0;
