@@ -1,0 +1,336 @@
+const VS = `
+attribute vec2 a_pos;
+attribute vec2 a_uv;
+varying vec2 v_uv;
+void main(){
+  v_uv = a_uv;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const FS_WARP = `
+precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+uniform float u_time;
+uniform vec2 u_center;
+uniform float u_angle;
+uniform float u_size;
+uniform vec2 u_resolution;
+uniform float u_warpPhase;
+uniform float u_warpSpeed;
+uniform float u_warpIntensity;
+
+void main(){
+  vec2 px = v_uv * u_resolution;
+
+  vec2 p = px - u_center;
+  float cosA = cos(-u_angle);
+  float sinA = sin(-u_angle);
+  vec2 rot = vec2(p.x*cosA - p.y*sinA, p.x*sinA + p.y*cosA);
+
+  vec2 uv = rot / u_size + 0.5;
+
+  // i luvvv warp
+  float localTime = u_time * u_warpSpeed + u_warpPhase;
+  vec2 warp = vec2(
+    sin(uv.y * 3.0 + localTime) * 0.2 + cos(uv.x * 2.0 - localTime * 0.5) * 0.15,
+    cos(uv.x * 3.0 + localTime) * 0.2 + sin(uv.y * 2.0 - localTime * 0.5) * 0.15
+  );
+  uv += warp * u_warpIntensity;
+
+  float d = length(p) / (u_size * 0.5);
+  float alpha = smoothstep(1.0, 0.2, d);
+  
+  if(alpha <= 0.01){
+    discard;
+  }
+
+  vec4 texColor = texture2D(u_tex, uv);
+  float luma = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+  float darkMask = 1.0 - smoothstep(0.0, 0.5, luma);
+  vec3 tintColor = vec3(0.157, 0.157, 0.235);
+  texColor.rgb = mix(texColor.rgb, tintColor, darkMask * 0.15);
+
+  gl_FragColor = vec4(texColor.rgb, alpha);
+}`;
+
+const FS_BLUR = `
+precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform float u_offset;
+void main() {
+  vec2 texel = 1.0 / u_res;
+  vec4 color = vec4(0.0);
+  color += texture2D(u_tex, v_uv + vec2(-u_offset, -u_offset) * texel);
+  color += texture2D(u_tex, v_uv + vec2(u_offset, -u_offset) * texel);
+  color += texture2D(u_tex, v_uv + vec2(-u_offset, u_offset) * texel);
+  color += texture2D(u_tex, v_uv + vec2(u_offset, u_offset) * texel);
+  gl_FragColor = color * 0.25;
+}`;
+
+const FS_OUT = `
+precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+uniform float u_saturation;
+uniform float u_brightness;
+uniform float u_time;
+uniform vec2 u_res;
+uniform float u_scale;
+uniform float u_dithering;
+
+highp float hash(highp vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+
+void main() {
+  vec2 uv = (v_uv - 0.5) / u_scale + 0.5;
+  uv = clamp(uv, 0.0, 1.0);
+
+  vec4 color = texture2D(u_tex, uv);
+  color.rgb *= u_brightness;
+  float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+  color.rgb = mix(vec3(gray), color.rgb, u_saturation);
+
+  highp vec2 pixelPos = floor(v_uv * u_res);
+  highp float noise = hash(vec3(pixelPos, floor(u_time * 60.0)));
+  color.rgb += (noise - 0.5) * u_dithering;
+
+  gl_FragColor = vec4(color.rgb, 1.0);
+}`;
+
+export default class Dybg {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.gl = canvas.getContext('webgl', { premultipliedAlpha: false });
+    if (!this.gl) throw new Error("WebGL not supported");
+
+    this.BLUR_PASSES = 5.3;
+    this.covers = [
+      {px: 0.85, py: 0.85, angle: 4.7, speed: -0.0009, scale: 1.7, warpPhase: 1.2, warpSpeed: 0.01},
+      {px: 0.15, py: 0.85, angle: 3.1, speed:  0.000002, scale: 1, warpPhase: 1, warpSpeed: 0.04},
+      {px: 0.0, py: 0.0, angle: 0.0, speed:  0.000004, scale: 1.5, warpPhase: 0.0, warpSpeed: 0.03},
+    ];
+    this.loaded = false;
+    this.t = 0;
+    this.startTime = 0;
+    this.rafId = null;
+
+    this.initShaders();
+    this.initBuffers();
+    this.initTextures();
+    this.resize();
+
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  compile(type, src) {
+    const s = this.gl.createShader(type);
+    this.gl.shaderSource(s, src);
+    this.gl.compileShader(s);
+    return s;
+  }
+
+  compileProgram(vsSrc, fsSrc) {
+    const p = this.gl.createProgram();
+    this.gl.attachShader(p, this.compile(this.gl.VERTEX_SHADER, vsSrc));
+    this.gl.attachShader(p, this.compile(this.gl.FRAGMENT_SHADER, fsSrc));
+    this.gl.linkProgram(p);
+    return p;
+  }
+
+  initShaders() {
+    this.progWarp = this.compileProgram(VS, FS_WARP);
+    this.progBlur = this.compileProgram(VS, FS_BLUR);
+    this.progOut  = this.compileProgram(VS, FS_OUT);
+
+    const gl = this.gl;
+    this.locs = {
+      warp: {
+        time: gl.getUniformLocation(this.progWarp, 'u_time'),
+        center: gl.getUniformLocation(this.progWarp, 'u_center'),
+        angle: gl.getUniformLocation(this.progWarp, 'u_angle'),
+        size: gl.getUniformLocation(this.progWarp, 'u_size'),
+        res: gl.getUniformLocation(this.progWarp, 'u_resolution'),
+        tex: gl.getUniformLocation(this.progWarp, 'u_tex'),
+        warpPhase: gl.getUniformLocation(this.progWarp, 'u_warpPhase'),
+        warpSpeed: gl.getUniformLocation(this.progWarp, 'u_warpSpeed'),
+        warpIntensity: gl.getUniformLocation(this.progWarp, 'u_warpIntensity')
+      },
+      blur: {
+        tex: gl.getUniformLocation(this.progBlur, 'u_tex'),
+        res: gl.getUniformLocation(this.progBlur, 'u_res'),
+        offset: gl.getUniformLocation(this.progBlur, 'u_offset')
+      },
+      out: {
+        tex: gl.getUniformLocation(this.progOut, 'u_tex'),
+        sat: gl.getUniformLocation(this.progOut, 'u_saturation'),
+        bri: gl.getUniformLocation(this.progOut, 'u_brightness'),
+        time: gl.getUniformLocation(this.progOut, 'u_time'),
+        res: gl.getUniformLocation(this.progOut, 'u_res'),
+        scale: gl.getUniformLocation(this.progOut, 'u_scale'),
+        dither: gl.getUniformLocation(this.progOut, 'u_dithering')
+      }
+    };
+  }
+
+  initBuffers() {
+    const gl = this.gl;
+    this.buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1,-1, 0,0,
+       1,-1, 1,0,
+      -1, 1, 0,1,
+       1, 1, 1,1,
+    ]), gl.STATIC_DRAW);
+  }
+
+  setupQuad(prog) {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
+    const aPos = gl.getAttribLocation(prog, 'a_pos');
+    const aUV  = gl.getAttribLocation(prog, 'a_uv');
+    gl.enableVertexAttribArray(aPos);
+    gl.enableVertexAttribArray(aUV);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 16, 0);
+    gl.vertexAttribPointer(aUV,  2, gl.FLOAT, false, 16, 8);
+  }
+
+  initTextures() {
+    const gl = this.gl;
+    this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  }
+
+  createFBO(w, h) {
+    const gl = this.gl;
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    return { tex: t, fb, w, h };
+  }
+
+  resize() {
+    this.canvas.width = this.canvas.offsetWidth;
+    this.canvas.height = this.canvas.offsetHeight;
+    
+    const BLUR_BASE = 256;
+    const maxDim = Math.max(this.canvas.width, this.canvas.height);
+    this.blurW = Math.max(1, Math.floor(BLUR_BASE * (this.canvas.width / maxDim)));
+    this.blurH = Math.max(1, Math.floor(BLUR_BASE * (this.canvas.height / maxDim)));
+    
+    const gl = this.gl;
+    if (this.fboBase) { gl.deleteFramebuffer(this.fboBase.fb); gl.deleteTexture(this.fboBase.tex); }
+    if (this.fboBlur1) { gl.deleteFramebuffer(this.fboBlur1.fb); gl.deleteTexture(this.fboBlur1.tex); }
+    if (this.fboBlur2) { gl.deleteFramebuffer(this.fboBlur2.fb); gl.deleteTexture(this.fboBlur2.tex); }
+    this.fboBase = this.createFBO(this.canvas.width, this.canvas.height);
+    this.fboBlur1 = this.createFBO(this.blurW, this.blurH);
+    this.fboBlur2 = this.createFBO(this.blurW, this.blurH);
+  }
+
+  loadImage(imgSource) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgSource);
+    this.loaded = true;
+    this.startTime = performance.now();
+    if (!this.rafId) {
+      this.draw();
+    }
+  }
+
+  draw = () => {
+    if(!this.loaded) return;
+    this.t += 0.016 * 1.1
+    const W = this.canvas.width, H = this.canvas.height;
+    const transition = Math.min(1.0, (performance.now() - this.startTime) / 800.0);
+    const gl = this.gl;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboBase.fb);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0.05, 0.05, 0.05, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(this.progWarp);
+    this.setupQuad(this.progWarp);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.uniform1i(this.locs.warp.tex, 0);
+    gl.uniform2f(this.locs.warp.res, W, H);
+    gl.uniform1f(this.locs.warp.time, this.t);
+    gl.uniform1f(this.locs.warp.warpIntensity, 1.0);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    this.covers.forEach(cv => {
+      cv.angle += cv.speed;
+      const sz = cv.scale * Math.max(W, H);
+      const cx = cv.px * W;
+      const cy = (1.0 - cv.py) * H;
+      gl.uniform2f(this.locs.warp.center, cx, cy);
+      gl.uniform1f(this.locs.warp.angle, cv.angle);
+      gl.uniform1f(this.locs.warp.size, sz);
+      gl.uniform1f(this.locs.warp.warpPhase, cv.warpPhase);
+      gl.uniform1f(this.locs.warp.warpSpeed, cv.warpSpeed);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    });
+
+    gl.disable(gl.BLEND);
+
+    gl.useProgram(this.progBlur);
+    this.setupQuad(this.progBlur);
+    gl.viewport(0, 0, this.blurW, this.blurH);
+    gl.uniform2f(this.locs.blur.res, this.blurW, this.blurH);
+    gl.uniform1i(this.locs.blur.tex, 0);
+
+    let readFBO = this.fboBase;
+    let writeFBO = this.fboBlur1;
+
+    for (let i = 0; i < this.BLUR_PASSES; i++) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, writeFBO.fb);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, readFBO.tex);
+      gl.uniform1f(this.locs.blur.offset, (i * 1.2) + 0.5);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      let temp = readFBO;
+      readFBO = writeFBO;
+      writeFBO = (temp === this.fboBase) ? this.fboBlur2 : temp;
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, W, H);
+    gl.useProgram(this.progOut);
+    this.setupQuad(this.progOut);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readFBO.tex);
+    gl.uniform1i(this.locs.out.tex, 0);
+    gl.uniform1f(this.locs.out.sat, 1.8);
+    gl.uniform1f(this.locs.out.bri, 0.8 * transition);
+    gl.uniform1f(this.locs.out.time, this.t);
+    gl.uniform2f(this.locs.out.res, W, H);
+    gl.uniform1f(this.locs.out.scale, 1.0);
+    gl.uniform1f(this.locs.out.dither, 0.008);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    this.rafId = requestAnimationFrame(this.draw);
+  }
+}
