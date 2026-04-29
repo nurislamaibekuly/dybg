@@ -30,26 +30,22 @@ void main(){
 
   vec2 uv = rot / u_size + 0.5;
 
-  // i luvvv warp
+  // smoother, more fluid warp for an organic look
   float localTime = u_time * u_warpSpeed + u_warpPhase;
   vec2 warp = vec2(
-    sin(uv.y * 3.0 + localTime) * 0.2 + cos(uv.x * 2.0 - localTime * 0.5) * 0.15,
-    cos(uv.x * 3.0 + localTime) * 0.2 + sin(uv.y * 2.0 - localTime * 0.5) * 0.15
+    sin(uv.y * 2.0 + localTime) * 0.3 + cos(uv.x * 1.5 - localTime * 0.7) * 0.2,
+    cos(uv.x * 2.0 + localTime) * 0.3 + sin(uv.y * 1.5 - localTime * 0.7) * 0.2
   );
   uv += warp * u_warpIntensity;
 
   float d = length(p) / (u_size * 0.5);
-  float alpha = smoothstep(1.0, 0.2, d);
+  float alpha = smoothstep(1.2, 0.0, d);
   
   if(alpha <= 0.01){
     discard;
   }
 
   vec4 texColor = texture2D(u_tex, uv);
-  float luma = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
-  float darkMask = 1.0 - smoothstep(0.0, 0.5, luma);
-  vec3 tintColor = vec3(0.157, 0.157, 0.235);
-  texColor.rgb = mix(texColor.rgb, tintColor, darkMask * 0.15);
 
   gl_FragColor = vec4(texColor.rgb, alpha);
 }`;
@@ -109,11 +105,11 @@ export default class Dybg {
     this.gl = canvas.getContext('webgl', { premultipliedAlpha: false });
     if (!this.gl) throw new Error("WebGL not supported");
 
-    this.BLUR_PASSES = 5.3;
+    this.BLUR_PASSES = 8;
     this.covers = [
-      {px: 0.85, py: 0.85, angle: 4.7, speed: -0.0009, scale: 1.7, warpPhase: 1.2, warpSpeed: 0.01},
-      {px: 0.15, py: 0.85, angle: 3.1, speed:  0.000002, scale: 1, warpPhase: 1, warpSpeed: 0.04},
-      {px: 0.0, py: 0.0, angle: 0.0, speed:  0.000004, scale: 1.5, warpPhase: 0.0, warpSpeed: 0.03},
+      {px: 0.3, py: 0.38, angle: 4.7, speed: -0.002, scale: 1.7, warpPhase: 1.1, warpSpeed: 0.015},
+      {px: 0.2, py: 0.8, angle: 3.1, speed:  0.0015, scale: 1.5, warpPhase: 1.0, warpSpeed: 0.02},
+      {px: 0.1, py: 0.1, angle: 0.0, speed:  0.001, scale: 1.6, warpPhase: 0.3, warpSpeed: 0.01},
     ];
     this.loaded = false;
     this.t = 0;
@@ -280,7 +276,7 @@ export default class Dybg {
 
   draw = () => {
     if(!this.loaded) return;
-    this.t += 0.016 * 1.1
+    this.t += 0.012;
     const W = this.canvas.width, H = this.canvas.height;
     const transition = Math.min(1.0, (performance.now() - this.startTime) / 800.0);
     const gl = this.gl;
@@ -330,7 +326,7 @@ export default class Dybg {
       gl.bindFramebuffer(gl.FRAMEBUFFER, writeFBO.fb);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, readFBO.tex);
-      gl.uniform1f(this.locs.blur.offset, (i * 1.2) + 0.5);
+      gl.uniform1f(this.locs.blur.offset, (i * 1.5) + 1.0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       let temp = readFBO;
@@ -345,12 +341,12 @@ export default class Dybg {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, readFBO.tex);
     gl.uniform1i(this.locs.out.tex, 0);
-    gl.uniform1f(this.locs.out.sat, 1.8);
-    gl.uniform1f(this.locs.out.bri, 0.8 * transition);
+    gl.uniform1f(this.locs.out.sat, 2.2);
+    gl.uniform1f(this.locs.out.bri, 1.05 * transition);
     gl.uniform1f(this.locs.out.time, this.t);
     gl.uniform2f(this.locs.out.res, W, H);
     gl.uniform1f(this.locs.out.scale, 1.0);
-    gl.uniform1f(this.locs.out.dither, 0.008);
+    gl.uniform1f(this.locs.out.dither, 0.004);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     this.rafId = requestAnimationFrame(this.draw);
