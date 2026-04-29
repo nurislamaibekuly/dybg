@@ -246,14 +246,36 @@ export default class Dybg {
   }
 
   loadImage(imgSource) {
-    const gl = this.gl;
-    gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgSource);
-    this.loaded = true;
-    this.startTime = performance.now();
-    if (!this.rafId) {
-      this.draw();
-    }
+    return new Promise((resolve, reject) => {
+      const applyTexture = (img) => {
+        try {
+          const gl = this.gl;
+          gl.bindTexture(gl.TEXTURE_2D, this.tex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+          this.loaded = true;
+          this.startTime = performance.now();
+          if (!this.rafId) {
+            this.draw();
+          }
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      if (typeof imgSource === 'string') {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => applyTexture(img);
+        img.onerror = () => reject(new Error(`Failed to load image: ${imgSource}`));
+        img.src = imgSource;
+      } else if (imgSource instanceof HTMLImageElement && !imgSource.complete) {
+        imgSource.onload = () => applyTexture(imgSource);
+        imgSource.onerror = reject;
+      } else {
+        applyTexture(imgSource);
+      }
+    });
   }
 
   draw = () => {
