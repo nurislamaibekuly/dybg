@@ -107,9 +107,9 @@ export default class Dybg {
 
     this.BLUR_PASSES = 8;
     this.covers = [
-      {px: 0.3, py: 0.38, angle: 4.7, speed: -0.002, scale: 1.7, warpPhase: 1.1, warpSpeed: 0.015},
-      {px: 0.2, py: 0.8, angle: 3.1, speed:  0.0015, scale: 1.5, warpPhase: 1.0, warpSpeed: 0.02},
-      {px: 0.1, py: 0.1, angle: 0.0, speed:  0.001, scale: 1.6, warpPhase: 0.3, warpSpeed: 0.01},
+      {px: 0.8, py: 0.4, angle: 4.7, speed: -0.002, scale: 1.7, warpPhase: 4, warpSpeed: 0.04},
+      {px: 0.3, py: 0.5, angle: 3.1, speed:  0.0015, scale: 1.5, warpPhase: 3.2, warpSpeed: 0.03},
+      {px: 0.6, py: 0.1, angle: 0.0, speed:  0.001, scale: 1.6, warpPhase: 2.9, warpSpeed: 0.015},
     ];
     this.loaded = false;
     this.t = 0;
@@ -342,7 +342,7 @@ export default class Dybg {
     gl.bindTexture(gl.TEXTURE_2D, readFBO.tex);
     gl.uniform1i(this.locs.out.tex, 0);
     gl.uniform1f(this.locs.out.sat, 2.2);
-    gl.uniform1f(this.locs.out.bri, 1.05 * transition);
+    gl.uniform1f(this.locs.out.bri, 0.8 * transition);
     gl.uniform1f(this.locs.out.time, this.t);
     gl.uniform2f(this.locs.out.res, W, H);
     gl.uniform1f(this.locs.out.scale, 1.0);
