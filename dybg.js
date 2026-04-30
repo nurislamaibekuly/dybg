@@ -57,13 +57,20 @@ uniform sampler2D u_tex;
 uniform vec2 u_res;
 uniform float u_offset;
 void main() {
-  vec2 texel = 1.0 / u_res;
-  vec4 color = vec4(0.0);
-  color += texture2D(u_tex, v_uv + vec2(-u_offset, -u_offset) * texel);
-  color += texture2D(u_tex, v_uv + vec2(u_offset, -u_offset) * texel);
-  color += texture2D(u_tex, v_uv + vec2(-u_offset, u_offset) * texel);
-  color += texture2D(u_tex, v_uv + vec2(u_offset, u_offset) * texel);
-  gl_FragColor = color * 0.25;
+  vec2 texel = u_offset / u_res;
+  vec4 color = texture2D(u_tex, v_uv) * 0.25;
+  
+  color += texture2D(u_tex, v_uv + vec2(-texel.x, 0.0)) * 0.125;
+  color += texture2D(u_tex, v_uv + vec2(texel.x, 0.0)) * 0.125;
+  color += texture2D(u_tex, v_uv + vec2(0.0, -texel.y)) * 0.125;
+  color += texture2D(u_tex, v_uv + vec2(0.0, texel.y)) * 0.125;
+  
+  color += texture2D(u_tex, v_uv + vec2(-texel.x, -texel.y)) * 0.0625;
+  color += texture2D(u_tex, v_uv + vec2(texel.x, -texel.y)) * 0.0625;
+  color += texture2D(u_tex, v_uv + vec2(-texel.x, texel.y)) * 0.0625;
+  color += texture2D(u_tex, v_uv + vec2(texel.x, texel.y)) * 0.0625;
+  
+  gl_FragColor = color;
 }`;
 
 const FS_OUT = `
@@ -87,7 +94,14 @@ void main() {
   vec2 uv = (v_uv - 0.5) / u_scale + 0.5;
   uv = clamp(uv, 0.0, 1.0);
 
-  vec4 color = texture2D(u_tex, uv);
+  vec2 dir = uv - 0.5;
+  vec2 caOffset = dir * 0.015;
+  vec4 color;
+  color.r = texture2D(u_tex, uv + caOffset).r;
+  color.g = texture2D(u_tex, uv).g;
+  color.b = texture2D(u_tex, uv - caOffset).b;
+  color.a = texture2D(u_tex, uv).a;
+  
   color.rgb *= u_brightness;
   float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
   color.rgb = mix(vec3(gray), color.rgb, u_saturation);
@@ -107,9 +121,8 @@ export default class Dybg {
 
     this.BLUR_PASSES = 8;
     this.covers = [
-      {px: 0.8, py: 0.4, angle: 4.7, speed: -0.002, scale: 1.7, warpPhase: 3, warpSpeed: 0.04},
-      {px: 0.3, py: 0.5, angle: 3.1, speed:  0.0015, scale: 1.5, warpPhase: 3.2, warpSpeed: 0.03},
-      {px: 0.0, py: 0.78, angle: 0.0, speed:  0.001, scale: 1.8, warpPhase: 3.3, warpSpeed: 0.015},
+      {px: 0.8, py: 0.4, angle: 4.7, speed: -0.0001, scale: 1.7, warpPhase: 5, warpSpeed: 0.000000000001},
+      {px: 0.0, py: 0.78, angle: 0.0, speed:  0.001, scale: 1.8, warpPhase: 3.3, warpSpeed: 0.0000000000005},
     ];
     this.loaded = false;
     this.t = 0;
