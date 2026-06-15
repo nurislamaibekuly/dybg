@@ -57,7 +57,6 @@ void main() {
   vec3 baseCol = vec3(0.0);
   for (int i = 0; i < N; i++) baseCol += u_cols[i];
   baseCol /= float(N);
-  baseCol *= 0.55;
 
   vec3 blended = wsum > 1e-4 ? acc / wsum : baseCol;
 
@@ -142,10 +141,10 @@ export default class Dybg {
 
     const gl = this.gl;
 
-    this.BLUR_PASSES = _isMobileDybg ? 1 : 2;
+    this.BLUR_PASSES = _isMobileDybg ? 2 : 3;
     this.RES_SCALE = _isMobileDybg ? 0.5 : 1.0;
     this.saturation = 1.2;
-    this.brightness = 1.0;
+    this.brightness = 1.1;
     this.dithering = 0.03;
     this.outScale = 1.02;
 
@@ -175,20 +174,16 @@ export default class Dybg {
   }
 
   _seedDefaults() {
-    const pts    = [0.18,0.20,  0.08,0.52,  0.14,0.86,  0.82,0.14,  0.90,0.58,  0.60,0.84];
-    const cols   = [0.98,0.16,0.06,  0.84,0.05,0.03,  0.24,0.01,0.01,  0.74,0.04,0.03,  0.70,0.05,0.03,  0.52,0.03,0.02];
-    const radii  = [0.72, 0.65, 0.55, 0.70, 0.62, 0.58];
-    const amps   = [0.06, 0.05, 0.04, 0.06, 0.05, 0.04];
-    const phases = [0.00, 1.10, 2.30, 3.70, 0.80, 5.10];
+    const cols = [0.98,0.16,0.06,  0.84,0.05,0.03,  0.24,0.01,0.01,  0.74,0.04,0.03,  0.70,0.05,0.03,  0.52,0.03,0.02];
     for (let i = 0; i < MESH_N; i++) {
-      this.points[i * 2]     = pts[i * 2];
-      this.points[i * 2 + 1] = pts[i * 2 + 1];
+      this.points[i * 2]     = Math.random();
+      this.points[i * 2 + 1] = Math.random();
       this.colors[i * 3]     = cols[i * 3];
       this.colors[i * 3 + 1] = cols[i * 3 + 1];
       this.colors[i * 3 + 2] = cols[i * 3 + 2];
-      this.radii[i]  = radii[i];
-      this.amps[i]   = amps[i];
-      this.phases[i] = phases[i];
+      this.radii[i]  = 0.55 + Math.random() * 0.30;
+      this.amps[i]   = 0.03 + Math.random() * 0.05;
+      this.phases[i] = Math.random() * Math.PI * 2;
     }
   }
 
