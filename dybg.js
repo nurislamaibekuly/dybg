@@ -7,7 +7,7 @@ void main(){
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
-const MESH_N = 6; // number of color control points
+const MESH_N = 6;
 
 const FS_MESH = `
 precision highp float;
@@ -21,10 +21,10 @@ uniform float u_dithering;
 
 #define N ${MESH_N}
 
-uniform vec2  u_pts[N]; 
+uniform vec2  u_pts[N];
 uniform vec3  u_cols[N];
 uniform float u_rads[N];
-uniform float u_amp[N]; 
+uniform float u_amp[N];
 uniform float u_phase[N];
 
 highp float hash(highp vec3 p) {
@@ -54,13 +54,14 @@ void main() {
     wsum += w;
   }
 
-  vec3 avgCol = vec3(0.0);
-  for (int i = 0; i < N; i++) avgCol += u_cols[i];
-  avgCol /= float(N);
+  vec3 baseCol = vec3(0.0);
+  for (int i = 0; i < N; i++) baseCol += u_cols[i];
+  baseCol /= float(N);
+  baseCol *= 0.55;
 
-  vec3 blended = wsum > 1e-4 ? acc / wsum : avgCol;
+  vec3 blended = wsum > 1e-4 ? acc / wsum : baseCol;
 
-  vec3 rgb = mix(avgCol, blended, clamp(wsum, 0.0, 1.0));
+  vec3 rgb = mix(baseCol, blended, clamp(wsum, 0.0, 1.0));
 
   rgb *= u_brightness;
   float gray = dot(rgb, vec3(0.299, 0.587, 0.114));
@@ -78,20 +79,19 @@ precision highp float;
 varying vec2 v_uv;
 uniform sampler2D u_tex;
 uniform vec2 u_res;
-uniform float u_offset;
+uniform vec2 u_dir;
+
 void main() {
-  vec2 texel = u_offset / u_res;
-  vec4 color = texture2D(u_tex, v_uv) * 0.25;
+  vec2 texel = u_dir / u_res;
 
-  color += texture2D(u_tex, v_uv + vec2(-texel.x, 0.0)) * 0.125;
-  color += texture2D(u_tex, v_uv + vec2( texel.x, 0.0)) * 0.125;
-  color += texture2D(u_tex, v_uv + vec2(0.0, -texel.y)) * 0.125;
-  color += texture2D(u_tex, v_uv + vec2(0.0,  texel.y)) * 0.125;
-
-  color += texture2D(u_tex, v_uv + vec2(-texel.x, -texel.y)) * 0.0625;
-  color += texture2D(u_tex, v_uv + vec2( texel.x, -texel.y)) * 0.0625;
-  color += texture2D(u_tex, v_uv + vec2(-texel.x,  texel.y)) * 0.0625;
-  color += texture2D(u_tex, v_uv + vec2( texel.x,  texel.y)) * 0.0625;
+  vec4 color = vec4(0.0);
+  color += texture2D(u_tex, v_uv + texel * -3.0) * 0.015625;
+  color += texture2D(u_tex, v_uv + texel * -2.0) * 0.09375;
+  color += texture2D(u_tex, v_uv + texel * -1.0) * 0.234375;
+  color += texture2D(u_tex, v_uv)                 * 0.3125;
+  color += texture2D(u_tex, v_uv + texel *  1.0) * 0.234375;
+  color += texture2D(u_tex, v_uv + texel *  2.0) * 0.09375;
+  color += texture2D(u_tex, v_uv + texel *  3.0) * 0.015625;
 
   gl_FragColor = color;
 }`;
@@ -117,13 +117,7 @@ void main() {
   vec2 uv = (v_uv - 0.5) / u_scale + 0.5;
   uv = clamp(uv, 0.0, 1.0);
 
-  vec2 dir = uv - 0.5;
-  vec2 caOffset = dir * 0.015;
-  vec4 color;
-  color.r = texture2D(u_tex, uv + caOffset).r;
-  color.g = texture2D(u_tex, uv).g;
-  color.b = texture2D(u_tex, uv - caOffset).b;
-  color.a = texture2D(u_tex, uv).a;
+  vec4 color = texture2D(u_tex, uv);
 
   color.rgb *= u_brightness;
   float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
@@ -148,12 +142,12 @@ export default class Dybg {
 
     const gl = this.gl;
 
-    this.BLUR_PASSES = _isMobileDybg ? 2 : 3;
-    this.RES_SCALE = _isMobileDybg ? 0.5 : 0.75;
-    this.saturation = 1.15;
+    this.BLUR_PASSES = _isMobileDybg ? 1 : 2;
+    this.RES_SCALE = _isMobileDybg ? 0.5 : 1.0;
+    this.saturation = 1.2;
     this.brightness = 1.0;
-    this.dithering = 0.04;
-    this.outScale = 1.05; // slight zoom in FS_OUT
+    this.dithering = 0.03;
+    this.outScale = 1.02;
 
     this.running = false;
     this.rafId = null;
@@ -183,8 +177,8 @@ export default class Dybg {
   _seedDefaults() {
     const pts    = [0.18,0.20,  0.08,0.52,  0.14,0.86,  0.82,0.14,  0.90,0.58,  0.60,0.84];
     const cols   = [0.98,0.16,0.06,  0.84,0.05,0.03,  0.24,0.01,0.01,  0.74,0.04,0.03,  0.70,0.05,0.03,  0.52,0.03,0.02];
-    const radii  = [0.85, 0.78, 0.60, 0.82, 0.76, 0.68];
-    const amps   = [0.05, 0.04, 0.03, 0.05, 0.04, 0.03];
+    const radii  = [0.72, 0.65, 0.55, 0.70, 0.62, 0.58];
+    const amps   = [0.06, 0.05, 0.04, 0.06, 0.05, 0.04];
     const phases = [0.00, 1.10, 2.30, 3.70, 0.80, 5.10];
     for (let i = 0; i < MESH_N; i++) {
       this.points[i * 2]     = pts[i * 2];
@@ -234,7 +228,8 @@ export default class Dybg {
 
   _program(vsSrc, fsSrc) {
     const gl = this.gl;
-    const vs = this._compile(gl.VERTEX_SHADER, vsSrc);    const fs = this._compile(gl.FRAGMENT_SHADER, fsSrc);
+    const vs = this._compile(gl.VERTEX_SHADER, vsSrc);
+    const fs = this._compile(gl.FRAGMENT_SHADER, fsSrc);
     const prog = gl.createProgram();
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
@@ -276,7 +271,7 @@ export default class Dybg {
       a_uv: gl.getAttribLocation(this.programs.blur, 'a_uv'),
       tex: gl.getUniformLocation(this.programs.blur, 'u_tex'),
       res: gl.getUniformLocation(this.programs.blur, 'u_res'),
-      offset: gl.getUniformLocation(this.programs.blur, 'u_offset'),
+      dir: gl.getUniformLocation(this.programs.blur, 'u_dir'),
     };
 
     this.locs.out = {
@@ -373,7 +368,7 @@ export default class Dybg {
   }
 
   _samplePalette(img, count) {
-    const S = 48; // downscale target
+    const S = 48;
     const c = document.createElement('canvas');
     c.width = S;
     c.height = S;
@@ -395,7 +390,7 @@ export default class Dybg {
     try {
       data = ctx.getImageData(0, 0, S, S).data;
     } catch (e) {
-      return null; // tainted canvas
+      return null;
     }
 
     const pixels = [];
@@ -537,7 +532,7 @@ export default class Dybg {
   _bindQuad(aPos, aUv) {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.quad);
-    const stride = 4 * 4; // 4 floats * 4 bytes
+    const stride = 4 * 4;
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, stride, 0);
     gl.enableVertexAttribArray(aUv);
@@ -586,18 +581,25 @@ export default class Dybg {
     let read = src;
     let write = dst;
     for (let i = 0; i < this.BLUR_PASSES; i++) {
-      const t = i / Math.max(1, this.BLUR_PASSES - 1);
-      const offset = 1.0 + Math.sin(t * Math.PI) * (this.BLUR_PASSES * 0.5);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, write.fb);
+      gl.viewport(0, 0, this.iw, this.ih);
+      gl.bindTexture(gl.TEXTURE_2D, read.tex);
+      gl.uniform2f(b.dir, 1.0, 0.0);
+      this._bindQuad(b.a_pos, b.a_uv);
+      this._drawQuad();
+
+      let tmp = read;
+      read = write;
+      write = tmp;
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, write.fb);
       gl.viewport(0, 0, this.iw, this.ih);
       gl.bindTexture(gl.TEXTURE_2D, read.tex);
-      gl.uniform1f(b.offset, offset);
-
+      gl.uniform2f(b.dir, 0.0, 1.0);
       this._bindQuad(b.a_pos, b.a_uv);
       this._drawQuad();
 
-      const tmp = read;
+      tmp = read;
       read = write;
       write = tmp;
     }
