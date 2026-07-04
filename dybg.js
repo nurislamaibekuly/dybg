@@ -94,7 +94,6 @@ export default class dybg {
       this._fbCanvas.style.display = 'block';
     }
     this._resize();
-    this._createPanel();
     if(image) this.load(image).catch(() => {});
 
     this._dropzone.addEventListener('click', () => this._fileInput.click());
@@ -524,7 +523,6 @@ export default class dybg {
     this._renderComposite(now, dt);
     if(this._useFallback) this._renderFallback();
     else this._renderGL(now);
-    this._updatePanel();
     this._animId = requestAnimationFrame((t) => this._loop(t));
   }
 
@@ -694,82 +692,6 @@ export default class dybg {
     this._animFromVal = this._animT;
     this._animFromTime = performance.now();
     this._pauseTime = performance.now();
-  }
-
-  _createPanel(){
-    this._panel = document.createElement('div');
-    this._panel.style.cssText = 'position:fixed;top:12px;right:12px;z-index:20;font-family:monospace;font-size:11px;color:#ccc;background:rgba(0,0,0,0.75);backdrop-filter:blur(12px);border-radius:10px;padding:14px 16px;min-width:200px;border:1px solid rgba(255,255,255,0.06);line-height:1.8;';
-    this._panel.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;">Debug</span>
-        <span id="_dismissPanel" style="cursor:pointer;color:#666;font-size:14px;">✕</span>
-      </div>
-      <label>Blur <input type="range" min="0" max="140" value="110" id="_pBlur" style="width:100px"></label>
-      <br>
-      <label>Layers <input type="range" min="2" max="6" step="1" value="3" id="_pLayers" style="width:100px"></label>
-      <br>
-      <label>Speed <input type="range" min="0" max="2" step="0.01" value="0.35" id="_pSpeed" style="width:100px"></label>
-      <br>
-      <label>Twist <input type="range" min="0" max="8" step="0.01" value="2" id="_pTwist" style="width:100px"></label>
-      <br>
-      <label>T.Radius <input type="range" min="0" max="3" step="0.01" value="1.5" id="_pTRadius" style="width:100px"></label>
-      <br>
-      <label>CA <input type="range" min="0" max="0.01" step="0.0001" value="0.002" id="_pCA" style="width:100px"></label>
-      <br>
-      <label>Saturate <input type="range" min="0.5" max="2" step="0.01" value="1.1" id="_pSat" style="width:100px"></label>
-      <br>
-      <label>Brightness <input type="range" min="0.3" max="1.2" step="0.01" value="0.8" id="_pBright" style="width:100px"></label>
-      <br>
-      <label>Contrast <input type="range" min="0.5" max="1.5" step="0.01" value="1.0" id="_pContrast" style="width:100px"></label>
-    `;
-    this._container.appendChild(this._panel);
-
-    this._panel.querySelector('#_dismissPanel').onclick = () => { this._panel.style.display = 'none'; };
-
-    const bind = (id, setter, parse = parseFloat) => {
-      const el = this._panel.querySelector('#' + id);
-      if(!el) return;
-      el.addEventListener('input', () => {
-        const v = parse(el.value);
-        setter.call(this, v);
-      });
-    };
-
-    bind('_pBlur',   function(v){ this.blur = v; });
-    bind('_pLayers', function(v){ this.layers = v; }, parseInt);
-    bind('_pSpeed',  function(v){ this.speed = v; });
-    bind('_pTwist',  function(v){ this.twist = v; });
-    bind('_pTRadius',function(v){ this.twistRadius = v; });
-    bind('_pCA',    function(v){ this.ca = v; });
-
-    this._panel.querySelector('#_pSat').addEventListener('input', (e) => {
-      this._outCanvas.style.filter = `saturate(${e.value}) contrast(${this._panel.querySelector('#_pContrast').value}) brightness(${this._panel.querySelector('#_pBright').value})`;
-    });
-    this._panel.querySelector('#_pBright').addEventListener('input', (e) => {
-      this._outCanvas.style.filter = `saturate(${this._panel.querySelector('#_pSat').value}) contrast(${this._panel.querySelector('#_pContrast').value}) brightness(${e.value})`;
-    });
-    this._panel.querySelector('#_pContrast').addEventListener('input', (e) => {
-      this._outCanvas.style.filter = `saturate(${this._panel.querySelector('#_pSat').value}) contrast(${e.value}) brightness(${this._panel.querySelector('#_pBright').value})`;
-    });
-
-    this._panelEls = {};
-    for(const id of ['_pBlur','_pLayers','_pSpeed','_pTwist','_pTRadius','_pCA','_pSat','_pBright','_pContrast']){
-      this._panelEls[id] = this._panel.querySelector('#' + id);
-    }
-  }
-
-  _updatePanel(){
-    if(!this._panel || this._panel.style.display === 'none') return;
-    const sync = (id, val) => {
-      const el = this._panelEls[id];
-      if(el && document.activeElement !== el) el.value = val;
-    };
-    sync('_pBlur', this._blurPx);
-    sync('_pLayers', this._layerCount);
-    sync('_pSpeed', this._speed);
-    sync('_pTwist', this._twistAngle);
-    sync('_pTRadius', this._twistRadius);
-    sync('_pCA', this._caStrength);
   }
 
   destroy(){
