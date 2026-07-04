@@ -3,79 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dybg Mesh Gradient — Test</title>
+<title>ambient cover</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden}
-  .stage{width:100%;height:100vh;position:relative;background:#000;overflow:hidden}
-  canvas{position:absolute;inset:0;width:100%;height:100%}
-  .upload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:10}
-  .upload label{
-    cursor:pointer;color:rgba(255,255,255,0.85);font-family:sans-serif;font-size:14px;
-    padding:10px 24px;border:1px solid rgba(255,255,255,0.35);border-radius:20px;
-    background:rgba(0,0,0,0.5);transition:background .2s
-  }
-  .upload label:hover{background:rgba(0,0,0,0.75)}
-  #filein{display:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#050506;}
+  #app{width:100vw;height:100vh;}
 </style>
 </head>
 <body>
-  <div class="stage">
-    <canvas id="c"></canvas>
+<div id="app"></div>
+<button id="playBtn" style="appearance:none;border:none;cursor:pointer;background:rgba(255,255,255,0.08);color:#e9e9ee;font-size:13px;font-weight:500;padding:9px 16px;border-radius:999px;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;font-family:-apple-system,'SF Pro Text',Helvetica,Arial,sans-serif;">⏸</button>
+<script type="module">
+import dybg from './ambient-cover.js';
 
-    <div class="upload" id="uploader">
-      <label>Choose album cover<input type="file" id="filein" accept="image/*"></label>
-    </div>
-  </div>
+const bg = new dybg('https://upload.wikimedia.org/wikipedia/en/2/27/NewJeans_-_Supernatural.png');
+bg.blur = 110;
+bg.layers = 3;
+bg.speed = 1;
+bg.twist = 0.3;
 
-  <script type="module">
-    import Dybg from './dybg.js';
-
-    const canvas = document.getElementById('c');
-    const bg = new Dybg(canvas);
-
-    if (typeof bg.start === 'function') bg.start();
-
-    function fit() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, Math.floor(window.innerWidth * dpr));
-      const h = Math.max(1, Math.floor(window.innerHeight * dpr));
-      if (typeof bg.resize === 'function') {
-        bg.resize(w, h);
-      } else {
-        canvas.width = w;
-        canvas.height = h;
-      }
-    }
-    window.addEventListener('resize', fit);
-    fit();
-
-    const uploader = document.getElementById('uploader');
-
-    document.getElementById('filein').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        if (typeof bg.loadImage === 'function')      bg.loadImage(img);
-        else if (typeof bg.setCover === 'function')  bg.setCover(img);
-        else console.warn('Dybg has no loadImage/setCover method');
-
-        uploader.style.display = 'none';
-        URL.revokeObjectURL(url);
-      };
-      img.onerror = () => {
-        console.error('Failed to load image');
-        URL.revokeObjectURL(url);
-      };
-      img.src = url;
-    });
-
-    window.addEventListener('beforeunload', () => {
-      if (typeof bg.dispose === 'function') bg.dispose();
-    });
-  </script>
+const btn = document.getElementById('playBtn');
+btn.addEventListener('click', () => {
+  if(bg.paused){
+    bg.play();
+    btn.textContent = '⏸';
+  } else {
+    bg.pause();
+    btn.textContent = '▶';
+  }
+});
+</script>
 </body>
 </html>
