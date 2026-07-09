@@ -7,7 +7,6 @@ export default class dybg {
     const {
       container = document.body,
       blur = 110,
-      layers = 3,
       speed = 0.35,
       twist = 1.2,
       twistRadius = 1.5,
@@ -15,7 +14,6 @@ export default class dybg {
     } = options;
 
     this._blurPx = blur;
-    this._layerCount = layers;
     this._speed = speed;
     this._twistAngle = twist;
     this._twistRadius = twistRadius;
@@ -33,7 +31,6 @@ export default class dybg {
     this._animFromTime = 0;
     this._compScale = 0.5;
     this._lastFrameTime = 0;
-    this._pinch = null;
     this._twistTargetX = 0.5;
     this._twistTargetY = 0.5;
     this._bgZoom = 1;
@@ -51,11 +48,11 @@ export default class dybg {
     this._container.appendChild(this._renderTarget);
 
     this._outCanvas = document.createElement('canvas');
-    this._outCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;filter:saturate(1.1) contrast(1.0) brightness(0.8);';
+    this._outCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;filter:saturate(2.75) contrast(1.05) brightness(0.75);';
     this._renderTarget.appendChild(this._outCanvas);
 
     this._fbCanvas = document.createElement('canvas');
-    this._fbCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;filter:saturate(1.1) contrast(1.0) brightness(0.8);';
+    this._fbCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;filter:saturate(2.75) contrast(1.05) brightness(0.75);';
     this._fbCtx = this._fbCanvas.getContext('2d');
     this._useFallback = false;
 
@@ -110,15 +107,18 @@ export default class dybg {
 
   _rand(min, max){ return min + Math.random() * (max - min); }
 
-  _randomLayerSpec(){
-    const size = this._rand(0.55, 1.00) * Math.max(this._W, this._H);
-    return {
-      x: this._rand(-0.2, 0.6) * this._W,
-      y: this._rand(-0.2, 0.6) * this._H,
-      size,
-      rot0: this._rand(0, 360),
-      speed: this._rand(0.3, 1.5) * (Math.random() < 0.5 ? 1 : -1),
-    };
+  // Exact Apple Music web player layer spec:
+  //   sprite 0: 125% viewport, centered, spin +0.003/tick
+  //   sprite 1:  80% viewport, at (0.4,0.4), spin -0.008/tick
+  //   sprite 2:  50% viewport, centered, spin -0.006/tick, orbits at radius w/4 linked spin*0.75
+  //   sprite 3:  25% viewport, centered offset, spin +0.004/tick, orbits at radius w/4 linked spin*0.75
+  _buildLayers(){
+    this._layers = [
+      { rot0: 0, frac: 1.25, cx: 0.5, cy: 0.5, spin:  0.003, orbit: false },
+      { rot0: 0, frac: 0.80, cx: 0.4, cy: 0.4, spin: -0.008, orbit: false },
+      { rot0: 0, frac: 0.50, cx: 0.5, cy: 0.5, spin: -0.006, orbit: true, orbitRadiusFrac: 0.25, orbitCx: 0.5, orbitCy: 0.5 },
+      { rot0: 0, frac: 0.25, cx: 0.5, cy: 0.5, spin:  0.004, orbit: true, orbitRadiusFrac: 0.25, orbitCx: 0.55, orbitCy: 0.5 },
+    ];
   }
 
   _randomBgSpec(){
@@ -129,21 +129,6 @@ export default class dybg {
       size,
       rot0: this._rand(0, 360),
       speed: this._rand(0.2, 0.6) * (Math.random() < 0.5 ? 1 : -1),
-    };
-  }
-
-  _randomPinch(){
-    return {
-      cx1: 0.5, cy1: 0.5,
-      ax1: this._rand(0.15, 0.30), ay1: this._rand(0.15, 0.30),
-      wx1: this._rand(0.006, 0.020), wy1: this._rand(0.006, 0.018),
-      phase1: this._rand(0, Math.PI*2),
-      radius1: this._rand(0.85, 1.20),
-      cx2: this._rand(0.20, 0.80), cy2: this._rand(0.20, 0.80),
-      ax2: this._rand(0.08, 0.18), ay2: this._rand(0.08, 0.18),
-      wx2: this._rand(0.008, 0.022), wy2: this._rand(0.008, 0.020),
-      phase2: this._rand(0, Math.PI*2),
-      radius2: this._rand(0.70, 1.10),
     };
   }
 
@@ -158,11 +143,6 @@ export default class dybg {
     this._fbCanvas.height = this._H;
     const gl = this._gl;
     if(gl && this._img) this._createBlurFBOs();
-  }
-
-  _buildLayers(count){
-    this._layers = [];
-    for(let i = 0; i < count; i++) this._layers.push(this._randomLayerSpec());
   }
 
   _drawContain(ctx, img, size){
@@ -211,15 +191,23 @@ export default class dybg {
     }
 
     for(const L of this._layers){
-      L.rot0 += L.speed * this._speed * this._animT * dt;
-      const angle = L.rot0 * Math.PI / 180;
+      L.rot0 += L.spin * 30 * this._speed * this._animT * dt;
+      const angle = L.rot0;
+
+      let lx = L.cx * cw;
+      let ly = L.cy * ch;
+      if(L.orbit){
+        const orbitPhase = L.rot0 * 0.75;
+        const orbitR = L.orbitRadiusFrac * this._W * this._compScale;
+        lx = L.orbitCx * cw + orbitR * Math.cos(orbitPhase);
+        ly = L.orbitCy * ch + orbitR * Math.sin(orbitPhase);
+        if(L === this._layers[3]) ly += 0.05 * this._W * this._compScale;
+      }
+
       ctx.save();
-      ctx.translate(
-        (L.x + L.size/2) * this._compScale,
-        (L.y + L.size/2) * this._compScale
-      );
+      ctx.translate(lx, ly);
       ctx.rotate(angle);
-      this._drawContain(ctx, this._img, L.size * this._compScale);
+      this._drawContain(ctx, this._img, L.frac * this._W * this._compScale);
       ctx.restore();
     }
     ctx.restore();
@@ -278,12 +266,6 @@ export default class dybg {
       precision highp float;
       varying vec2 v_uv;
       uniform sampler2D u_tex;
-      uniform vec2 u_center1;
-      uniform vec2 u_center2;
-      uniform float u_strength1;
-      uniform float u_strength2;
-      uniform float u_radius1;
-      uniform float u_radius2;
       uniform vec2 u_twistCenter;
       uniform float u_twistAngle;
       uniform float u_twistRadius;
@@ -291,27 +273,8 @@ export default class dybg {
       uniform float u_caStrength;
       void main(){
         vec2 uv = v_uv;
-        vec2 offset = vec2(0.0);
 
-        vec2 d1 = uv - u_center1;
-        d1.x *= u_aspect;
-        float dist1 = length(d1);
-        float pct1 = 1.0 - smoothstep(0.0, u_radius1, dist1);
-        vec2 off1 = d1 * pow(pct1, 2.2) * u_strength1;
-        off1.x /= u_aspect;
-        offset += off1;
-
-        vec2 d2 = uv - u_center2;
-        d2.x *= u_aspect;
-        float dist2 = length(d2);
-        float pct2 = 1.0 - smoothstep(0.0, u_radius2, dist2);
-        vec2 off2 = d2 * pow(pct2, 2.2) * u_strength2;
-        off2.x /= u_aspect;
-        offset += off2;
-
-        vec2 warpedUV = uv - offset;
-
-        vec2 coord = warpedUV - u_twistCenter;
+        vec2 coord = uv - u_twistCenter;
         coord.x *= u_aspect;
         float dist = length(coord);
         float theta = 0.0;
@@ -359,12 +322,6 @@ export default class dybg {
     gl.enableVertexAttribArray(pPos);
     gl.vertexAttribPointer(pPos, 2, gl.FLOAT, false, 0, 0);
     gl.uniform1i(gl.getUniformLocation(this._fxProg, 'u_tex'), 0);
-    this._center1Loc    = gl.getUniformLocation(this._fxProg, 'u_center1');
-    this._center2Loc    = gl.getUniformLocation(this._fxProg, 'u_center2');
-    this._strength1Loc  = gl.getUniformLocation(this._fxProg, 'u_strength1');
-    this._strength2Loc  = gl.getUniformLocation(this._fxProg, 'u_strength2');
-    this._radius1Loc    = gl.getUniformLocation(this._fxProg, 'u_radius1');
-    this._radius2Loc    = gl.getUniformLocation(this._fxProg, 'u_radius2');
     this._twistCenterLoc = gl.getUniformLocation(this._fxProg, 'u_twistCenter');
     this._twistAngleLoc  = gl.getUniformLocation(this._fxProg, 'u_twistAngle');
     this._twistRadiusLoc = gl.getUniformLocation(this._fxProg, 'u_twistRadius');
@@ -436,13 +393,6 @@ export default class dybg {
       return;
     }
 
-    const t = (now - this._startTime) / 1000;
-    const pinch = this._pinch;
-    const cx1 = pinch.cx1 + Math.sin(t * pinch.wx1 + pinch.phase1) * pinch.ax1;
-    const cy1 = pinch.cy1 + Math.cos(t * pinch.wy1 + pinch.phase1) * pinch.ay1;
-    const cx2 = pinch.cx2 + Math.sin(t * pinch.wx2 + pinch.phase2) * pinch.ax2;
-    const cy2 = pinch.cy2 + Math.cos(t * pinch.wy2 + pinch.phase2) * pinch.ay2;
-
     const numPasses = Math.max(0, Math.round(this._blurPx / 6));
 
     if(numPasses > 0){
@@ -467,12 +417,6 @@ export default class dybg {
     gl.uniform2f(this._twistCenterLoc, this._twistCX, this._twistCY);
     gl.uniform1f(this._twistAngleLoc, this._twistAngle * this._animT);
     gl.uniform1f(this._twistRadiusLoc, this._twistRadius);
-    gl.uniform2f(this._center1Loc, cx1, cy1);
-    gl.uniform2f(this._center2Loc, cx2, cy2);
-    gl.uniform1f(this._strength1Loc, this._animT);
-    gl.uniform1f(this._strength2Loc, this._animT * 0.6);
-    gl.uniform1f(this._radius1Loc, pinch.radius1);
-    gl.uniform1f(this._radius2Loc, pinch.radius2);
     gl.uniform1f(this._aspectLoc, this._W / this._H);
     gl.uniform1f(this._caStrengthLoc, this._caStrength * this._animT);
     gl.viewport(0, 0, this._W, this._H);
@@ -500,16 +444,6 @@ export default class dybg {
     let dt = this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 0;
     dt = Math.min(dt, 0.1);
     this._lastFrameTime = now;
-
-    // Drift twist center toward random target
-    if(this._animTarget === 1){
-      const driftSpeed = 0.3 * dt;
-      this._twistCX += (this._twistTargetX - this._twistCX) * driftSpeed;
-      this._twistCY += (this._twistTargetY - this._twistCY) * driftSpeed;
-      const dx = this._twistCX - this._twistTargetX;
-      const dy = this._twistCY - this._twistTargetY;
-      if(dx * dx + dy * dy < 0.002) this._pickTwistTarget();
-    }
 
     // Drift pan toward random target
     if(this._animTarget === 1){
@@ -580,8 +514,7 @@ export default class dybg {
     }
     this._resize();
     this._bgLayer = this._randomBgSpec();
-    this._buildLayers(this._layerCount);
-    this._pinch = this._randomPinch();
+    this._buildLayers();
     this._randomizeTwist();
     this._dropzone.style.display = 'none';
     this._animTarget = 1;
@@ -596,8 +529,7 @@ export default class dybg {
   randomize(){
     if(!this._img) return;
     this._bgLayer = this._randomBgSpec();
-    this._buildLayers(this._layerCount);
-    this._pinch = this._randomPinch();
+    this._buildLayers();
     this._randomizeTwist();
     this._animTarget = 1;
     this._animFromVal = 0;
@@ -608,14 +540,8 @@ export default class dybg {
   }
 
   _randomizeTwist(){
-    this._twistCX = 0.2 + Math.random() * 0.6;
-    this._twistCY = 0.2 + Math.random() * 0.6;
-    this._pickTwistTarget();
-  }
-
-  _pickTwistTarget(){
-    this._twistTargetX = 0.15 + Math.random() * 0.7;
-    this._twistTargetY = 0.15 + Math.random() * 0.7;
+    this._twistCX = 0.5;
+    this._twistCY = 0.5;
   }
 
   _sampleBgColor(){
@@ -657,13 +583,6 @@ export default class dybg {
   get twist(){ return this._twistAngle; }
   set twist(v){
     this._twistAngle = Math.max(0, Math.min(8, v));
-  }
-
-  get layers(){ return this._layerCount; }
-  set layers(v){
-    const n = Math.max(2, Math.min(6, Math.round(v)));
-    this._layerCount = n;
-    if(this._img) this._buildLayers(n);
   }
 
   get speed(){ return this._speed; }
@@ -708,4 +627,3 @@ export default class dybg {
     }
   }
 }
-// :3
