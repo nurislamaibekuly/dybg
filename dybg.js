@@ -59,26 +59,6 @@ export default class dybg {
     this._compCanvas = document.createElement('canvas');
     this._compCtx = this._compCanvas.getContext('2d');
 
-    this._dropzone = document.createElement('div');
-    this._dropzone.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;cursor:pointer;z-index:5;';
-    this._renderTarget.appendChild(this._dropzone);
-
-    const glyph = document.createElement('div');
-    glyph.style.cssText = 'width:56px;height:56px;border-radius:16px;border:1.5px dashed rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;font-size:26px;color:rgba(255,255,255,0.65);';
-    glyph.textContent = '+';
-    this._dropzone.appendChild(glyph);
-
-    const hint = document.createElement('p');
-    hint.style.cssText = 'margin:0;color:#8a8a94;font-size:14px;letter-spacing:0.2px;font-family:-apple-system,"SF Pro Text",Helvetica,Arial,sans-serif;';
-    hint.innerHTML = '<strong style="color:#e9e9ee;font-weight:600;">Click to upload</strong> an album cover / image';
-    this._dropzone.appendChild(hint);
-
-    this._fileInput = document.createElement('input');
-    this._fileInput.type = 'file';
-    this._fileInput.accept = 'image/*';
-    this._fileInput.style.display = 'none';
-    this._renderTarget.appendChild(this._fileInput);
-
     try {
       this._gl = this._outCanvas.getContext('webgl', { alpha: false });
     } catch(e){}
@@ -93,25 +73,11 @@ export default class dybg {
     this._resize();
     if(image) this.load(image).catch(() => {});
 
-    this._dropzone.addEventListener('click', () => this._fileInput.click());
-    this._fileInput.addEventListener('change', (e) => {
-      if(e.target.files && e.target.files[0]) this.load(e.target.files[0]);
-    });
-    window.addEventListener('dragover', this._dragOver = (e) => e.preventDefault());
-    window.addEventListener('drop', this._drop = (e) => {
-      e.preventDefault();
-      if(e.dataTransfer.files && e.dataTransfer.files[0]) this.load(e.dataTransfer.files[0]);
-    });
     window.addEventListener('resize', this._resizeHandler = () => { if(this._img) this._resize(); });
   }
 
   _rand(min, max){ return min + Math.random() * (max - min); }
 
-  // Exact Apple Music web player layer spec:
-  //   sprite 0: 125% viewport, centered, spin +0.003/tick
-  //   sprite 1:  80% viewport, at (0.4,0.4), spin -0.008/tick
-  //   sprite 2:  50% viewport, centered, spin -0.006/tick, orbits at radius w/4 linked spin*0.75
-  //   sprite 3:  25% viewport, centered offset, spin +0.004/tick, orbits at radius w/4 linked spin*0.75
   _buildLayers(){
     this._layers = [
       { rot0: 0, frac: 1.25, cx: 0.5, cy: 0.5, spin:  0.003, orbit: false },
@@ -176,8 +142,6 @@ export default class dybg {
     this._drawCover(ctx, this._img, Math.max(cw, ch));
 
     if(this._bgLayer){
-      // Accumulate angle using dt so speed changes and pause/play transitions
-      // (animT ramping 0..1) integrate correctly instead of snapping.
       this._bgLayer.rot0 += this._bgLayer.speed * this._speed * this._animT * dt;
       const bgAngle = this._bgLayer.rot0 * Math.PI / 180;
       ctx.save();
@@ -439,13 +403,10 @@ export default class dybg {
     this._animT = this._animFromVal + (this._animTarget - this._animFromVal) * eased;
     this._bgZoom = 1.2 - 0.2 * this._animT;
 
-    // Clamp dt so a backgrounded/throttled tab resuming doesn't produce one
-    // huge rotation jump on the next frame.
     let dt = this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 0;
     dt = Math.min(dt, 0.1);
     this._lastFrameTime = now;
 
-    // Drift pan toward random target
     if(this._animTarget === 1){
       this._bgPanX += (this._bgPanTargetX - this._bgPanX) * 0.4 * dt;
       this._bgPanY += (this._bgPanTargetY - this._bgPanY) * 0.4 * dt;
@@ -462,7 +423,6 @@ export default class dybg {
 
   load(image){
     if(!image) return;
-    this._dropzone.style.display = 'none';
     if(image instanceof File || image instanceof Blob){
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -500,6 +460,10 @@ export default class dybg {
     }
   }
 
+  loadImage(image){
+    return this.load(image);
+  }
+
   _onImageReady(img){
     this._img = img;
     this._sampleBgColor();
@@ -516,7 +480,6 @@ export default class dybg {
     this._bgLayer = this._randomBgSpec();
     this._buildLayers();
     this._randomizeTwist();
-    this._dropzone.style.display = 'none';
     this._animTarget = 1;
     this._animFromVal = 0;
     this._animFromTime = 0;
@@ -616,8 +579,6 @@ export default class dybg {
   destroy(){
     if(this._animId) cancelAnimationFrame(this._animId);
     this._animId = null;
-    window.removeEventListener('dragover', this._dragOver);
-    window.removeEventListener('drop', this._drop);
     window.removeEventListener('resize', this._resizeHandler);
     this._renderTarget.remove();
     const gl = this._gl;
