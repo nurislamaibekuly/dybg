@@ -3,34 +3,235 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ambient cover</title>
+<title>Ambient Cover Editor</title>
+
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#050506;}
-  #app{width:100vw;height:100vh;}
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #050506;
+}
+
+#bgCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.controls {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(20px);
+    color: white;
+    font-family: -apple-system, sans-serif;
+    min-width: 260px;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.value {
+    opacity: 0.7;
+}
+
+input[type="range"] {
+    width: 100%;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+button {
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    background: rgba(255,255,255,0.08);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: 999px;
+}
+
+.row button.flex {
+    flex: 1;
+}
+
+#playBtn {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+}
 </style>
 </head>
 <body>
-<div id="app"></div>
-<button id="playBtn" style="appearance:none;border:none;cursor:pointer;background:rgba(255,255,255,0.08);color:#e9e9ee;font-size:13px;font-weight:500;padding:9px 16px;border-radius:999px;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;font-family:-apple-system,'SF Pro Text',Helvetica,Arial,sans-serif;">⏸</button>
+
+<canvas id="bgCanvas"></canvas>
+
+<div class="controls">
+
+    <label>
+        Upload Image
+        <input type="file" id="image" accept="image/*">
+    </label>
+
+    <label>
+        Flow Speed (<span class="value" id="speedValue">0.03</span>)
+        <input type="range" id="speed" min="0" max="1" step="0.01" value="0.03">
+    </label>
+
+    <label>
+        Volume Pulse (<span class="value" id="volumeValue">0</span>)
+        <input type="range" id="volume" min="0" max="10" step="0.1" value="0">
+    </label>
+
+    <label>
+        Resolution (<span class="value" id="scaleValue">0.50</span>)
+        <input type="range" id="scale" min="0.25" max="1" step="0.05" value="0.5">
+    </label>
+
+    <label>
+        Subdivisions (<span class="value" id="subValue">50</span>)
+        <input type="range" id="sub" min="10" max="100" step="5" value="50">
+    </label>
+
+    <label class="row">
+        <input type="checkbox" id="wireframe">
+        Wireframe
+    </label>
+
+    <label class="row">
+        <input type="checkbox" id="manual">
+        Manual Control Points
+    </label>
+
+    <div class="row">
+        <button class="flex" id="randomBtn">Randomize</button>
+    </div>
+
+</div>
+
+<button id="playBtn">❚❚ Pause</button>
+
 <script type="module">
-import dybg from './dybg.js';
+import dybg from "./dybg.js";
 
-const bg = new dybg('https://upload.wikimedia.org/wikipedia/en/2/27/NewJeans_-_Supernatural.png');
-bg.blur = 110;
-bg.layers = 3;
-bg.speed = 1;
-bg.twist = 0.3;
+const DEFAULT_COVER =
+    "https://upload.wikimedia.org/wikipedia/en/2/27/NewJeans_-_Supernatural.png";
 
-const btn = document.getElementById('playBtn');
-btn.addEventListener('click', () => {
-  if(bg.paused){
-    bg.play();
-    btn.textContent = '⏸';
-  } else {
-    bg.pause();
-    btn.textContent = '▶';
-  }
+// Create the background canvas and renderer.
+const canvas = document.getElementById("bgCanvas");
+const bg = new dybg(canvas);
+bg.setAlbum(DEFAULT_COVER).catch(() => {});
+
+// Grab all elements.
+const imageInput = document.getElementById("image");
+
+const speedSlider = document.getElementById("speed");
+const volumeSlider = document.getElementById("volume");
+const scaleSlider = document.getElementById("scale");
+const subSlider = document.getElementById("sub");
+const wireframeBox = document.getElementById("wireframe");
+const manualBox = document.getElementById("manual");
+
+const speedValue = document.getElementById("speedValue");
+const volumeValue = document.getElementById("volumeValue");
+const scaleValue = document.getElementById("scaleValue");
+const subValue = document.getElementById("subValue");
+
+const randomBtn = document.getElementById("randomBtn");
+const playBtn = document.getElementById("playBtn");
+
+let playing = true;
+
+// Upload image.
+imageInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    try {
+        await bg.setAlbum(url);
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+});
+
+// Flow speed.
+speedSlider.addEventListener("input", () => {
+    const value = Number(speedSlider.value);
+    speedValue.textContent = value.toFixed(2);
+    bg.setFlowSpeed(value);
+});
+
+// Volume pulse (bass effect).
+volumeSlider.addEventListener("input", () => {
+    const value = Number(volumeSlider.value);
+    volumeValue.textContent = value;
+    bg.setLowFreqVolume(value);
+});
+
+// Render scale / resolution.
+scaleSlider.addEventListener("input", () => {
+    const value = Number(scaleSlider.value);
+    scaleValue.textContent = value.toFixed(2);
+    bg.setRenderScale(value);
+});
+
+// Subdivisions (mesh smoothness/quality).
+subSlider.addEventListener("input", () => {
+    const value = Number(subSlider.value);
+    subValue.textContent = value;
+    bg.resetSubdivition(value);
+});
+
+// Wireframe mode.
+wireframeBox.addEventListener("change", () => {
+    bg.setWireFrame(wireframeBox.checked);
+});
+
+// Manual control point editing.
+manualBox.addEventListener("change", () => {
+    bg.setManualControl(manualBox.checked);
+});
+
+// Randomize the mesh layout.
+randomBtn.addEventListener("click", () => {
+    bg.randomize();
+});
+
+// Play / Pause (soft transition: waves flatten + speed eases to 0 with ease-in-out over 0.3s).
+playBtn.addEventListener("click", () => {
+    if (playing) {
+        bg.pause();
+        playBtn.textContent = "▶ Play";
+    } else {
+        bg.resume();
+        playBtn.textContent = "❚❚ Pause";
+    }
+    playing = !playing;
 });
 </script>
+
 </body>
 </html>
