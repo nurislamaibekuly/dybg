@@ -1522,21 +1522,7 @@ export default class dybg {
 
   _loadRemote(url, isVideo, ctrl) {
     return new Promise((resolve) => {
-      if (!isVideo && typeof createImageBitmap === 'function') {
-        fetch(url, { signal: ctrl.signal })
-          .then((resp) =>
-            resp.ok ? resp.blob() : Promise.reject(new Error('bad status')),
-          )
-          .then((blob) =>
-            createImageBitmap(blob, {
-              resizeWidth: _MGR_TEX_SIZE,
-              resizeHeight: _MGR_TEX_SIZE,
-              resizeQuality: 'low',
-            }),
-          )
-          .then((bitmap) => resolve(bitmap))
-          .catch(() => resolve(null));
-      } else {
+      const loadViaElement = () => {
         const el = isVideo ? document.createElement('video') : new Image();
         el.crossOrigin = 'anonymous';
         const onOk = () => resolve(el);
@@ -1551,6 +1537,25 @@ export default class dybg {
         }
         el.src = url;
         if (isVideo) el.play().catch(() => {});
+      };
+      if (isVideo || /^blob:/i.test(url)) {
+        loadViaElement();
+      } else if (typeof createImageBitmap === 'function') {
+        fetch(url, { signal: ctrl.signal })
+          .then((resp) =>
+            resp.ok ? resp.blob() : Promise.reject(new Error('bad status')),
+          )
+          .then((blob) =>
+            createImageBitmap(blob, {
+              resizeWidth: _MGR_TEX_SIZE,
+              resizeHeight: _MGR_TEX_SIZE,
+              resizeQuality: 'low',
+            }),
+          )
+          .then((bitmap) => resolve(bitmap))
+          .catch(() => loadViaElement());
+      } else {
+        loadViaElement();
       }
     });
   }
