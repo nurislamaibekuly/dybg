@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;background:#222;font:12px monospace;color:#fff">
+<div style="display:flex;gap:4px">
+  <canvas id="a" width="640" height="400"></canvas>
+  <canvas id="b" width="640" height="400"></canvas>
+  <canvas id="c" width="640" height="400"></canvas>
+</div>
+<pre id="info" style="position:fixed;top:0;left:0;z-index:99;margin:0;background:#000;color:#0f0;font-size:28px;line-height:1.2;padding:4px 8px"></pre>
+<script type="module">
+import dybg from "./dybg.js";
+const glc = document.createElement("canvas");
+glc.style.width = "1280px"; glc.style.height = "800px";
+document.body.appendChild(glc);
+const bg = new dybg(glc);
+const URL_ = "https://upload.wikimedia.org/wikipedia/en/2/27/NewJeans_-_Supernatural.png";
+await bg.setAlbum(URL_);
+document.getElementById("a").getContext("2d").drawImage(bg._comp, 0, 0);
+document.getElementById("b").getContext("2d").putImageData(bg._lastImage, 0, 0);
+
+const cctx = document.getElementById("c").getContext("2d");
+const info = document.getElementById("info");
+let n = 0;
+function loop() {
+  cctx.drawImage(glc, 0, 0, 640, 400);
+  const s = bg._states[bg._states.length - 1];
+  if (s && n % 30 === 0) {
+    info.textContent = JSON.stringify({
+      vol: bg._volume,
+      alpha: s.alpha && s.alpha.toFixed(3),
+      W: bg._W, H: bg._H,
+      time: bg._time && Math.round(bg._time),
+      flow: bg._flowSpeed,
+      cpW: s.mesh.cpW, cpH: s.mesh.cpH,
+      rgb: [s.mesh.cp[2], s.mesh.cp[3], s.mesh.cp[4]],
+      tex: [bg._lastImage.width, bg._lastImage.height],
+      comp: [bg._comp.width, bg._comp.height],
+      manual: bg._manual,
+      states: bg._states.length,
+      uvol: bg._meshUni && bg._meshUni.u_volume ? "loc" : "none",
+      cp2: s.mesh.cp.slice(18, 27),
+    }, null, 0);
+  }
+  n++;
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

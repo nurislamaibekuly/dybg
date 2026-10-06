@@ -473,7 +473,7 @@ export class MeshGradient {
 const _MGR_EASE = (x) =>
   0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, x)));
 const _MGR_CLAMP01 = (v) => Math.max(0, Math.min(1, v));
-const _MGR_TEX_SIZE = 32;
+const _MG_COMP_LONG = 640;
 const _MG_PLAYBACK_MS = 1000;
 const _MG_EASE = (t) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -548,12 +548,16 @@ float gradientNoise(in vec2 uv) {
 void main(){
   float volumeEffect = u_volume * 2.0;
   float dither = INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255;
-  vec2 centeredUV = v_uv - vec2(0.2);
+  vec2 centeredUV = v_uv - vec2(0.5);
   vec2 rotatedUV = vec2(
     u_cosAngle * centeredUV.x - u_sinAngle * centeredUV.y,
     u_sinAngle * centeredUV.x + u_cosAngle * centeredUV.y
   );
   vec2 finalUV = rotatedUV * max(0.001, 1.0 - volumeEffect) + vec2(0.5);
+  finalUV = vec2(
+    1.0 - abs(mod(finalUV.x, 2.0) - 1.0),
+    1.0 - abs(mod(finalUV.y, 2.0) - 1.0)
+  );
   vec4 result = texture2D(u_texture, finalUV);
   float alphaVolumeFactor = u_alpha * max(0.5, 1.0 - u_volume * 0.5);
   result.rgb *= v_color * alphaVolumeFactor;
@@ -964,8 +968,8 @@ class _MGTexture {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageData);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   }
   bind() {
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.tex);
@@ -1254,9 +1258,13 @@ export default class dybg {
     this._gl = gl;
 
     this._initGL();
-    this._reduced = document.createElement('canvas');
-    this._reduced.width = _MGR_TEX_SIZE;
-    this._reduced.height = _MGR_TEX_SIZE;
+
+    this._srcEl = null;
+    this._layout = null;
+    this._layoutDirty = false;
+    this._compAspect = 0;
+    this._comp = document.createElement('canvas');
+    this._compCtx = this._comp.getContext('2d', { willReadFrequently: true });
 
     canvas.addEventListener('webglcontextlost', this._onLost);
     canvas.addEventListener('webglcontextrestored', this._onRestored);
@@ -1323,6 +1331,12 @@ export default class dybg {
   _checkSize() {
     const c = this._canvas;
     const dpr = window.devicePixelRatio || 1;
+    const vw = c.clientWidth || window.innerWidth;
+    const vh = c.clientHeight || window.innerHeight;
+    const aspect = vw / Math.max(1, vh);
+    if (this._srcEl && this._compAspect && Math.abs(aspect - this._compAspect) > 0.02) {
+      this._layoutDirty = true;
+    }
     const w = Math.max(1, Math.round(c.clientWidth * dpr * this._renderScale));
     const h = Math.max(1, Math.round(c.clientHeight * dpr * this._renderScale));
     if (w === this._W && h === this._H) return;
@@ -1473,51 +1487,103 @@ export default class dybg {
     for (let i = 0; i < data.length; i++) data[i] = src[i];
   }
 
-  _processImage(src) {
-    const c = this._reduced;
-    const S = _MGR_TEX_SIZE;
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.clearRect(0, 0, S, S);
-    let w = 0;
-    let h = 0;
-    if (src instanceof HTMLVideoElement) {
-      w = src.videoWidth;
-      h = src.videoHeight;
-    } else if (src instanceof ImageBitmap || src instanceof HTMLCanvasElement) {
-      w = src.width;
-      h = src.height;
-    } else {
-      w = src.naturalWidth;
-      h = src.naturalHeight;
+  _rand(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  _randomizeLayout() {
+    const fracs = [
+      this._rand(0.85, 1.0),
+      this._rand(0.6, 0.7),
+      this._rand(0.45, 0.55),
+      this._rand(0.33, 0.4),
+      this._rand(0.22, 0.3),
+    ];
+    this._layout = {
+      zoom: this._rand(1.15, 1.35),
+      panX: this._rand(-0.06, 0.06),
+      panY: this._rand(-0.06, 0.06),
+      clones: fracs.map((frac, i) => ({
+        frac,
+        x: i === 0 ? this._rand(0.4, 0.6) : this._rand(0.15, 0.85),
+        y: i === 0 ? this._rand(0.4, 0.6) : this._rand(0.18, 0.82),
+        rot: i === 0 ? this._rand(-0.5, 0.5) : this._rand(-Math.PI, Math.PI),
+      })),
+    };
+  }
+
+  _srcSize(src) {
+    if (src instanceof HTMLVideoElement) return [src.videoWidth, src.videoHeight];
+    if (src instanceof ImageBitmap || src instanceof HTMLCanvasElement) return [src.width, src.height];
+    return [src.naturalWidth || src.width || 0, src.naturalHeight || src.height || 0];
+  }
+
+  _drawClone(ctx, src, iw, ih, cx, cy, size, rot, cover) {
+    const scale = cover ? Math.max(size / iw, size / ih) : Math.min(size / iw, size / ih);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    ctx.drawImage(src, (-iw * scale) / 2, (-ih * scale) / 2, iw * scale, ih * scale);
+    ctx.restore();
+  }
+
+  _composeArtwork(src) {
+    const [iw, ih] = this._srcSize(src);
+    if (!iw || !ih) return null;
+
+    const c = this._comp;
+    const vw = this._canvas.clientWidth || window.innerWidth;
+    const vh = this._canvas.clientHeight || window.innerHeight;
+    const aspect = vw / Math.max(1, vh);
+    const w = Math.round(aspect >= 1 ? _MG_COMP_LONG : _MG_COMP_LONG * aspect);
+    const h = Math.round(aspect >= 1 ? _MG_COMP_LONG / aspect : _MG_COMP_LONG);
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
     }
-    if (!w || !h) return null;
-    const sc = Math.min(S / w, S / h);
-    const dw = w * sc;
-    const dh = h * sc;
-    ctx.drawImage(src, (S - dw) / 2, (S - dh) / 2, dw, dh);
-    const imageData = ctx.getImageData(0, 0, S, S);
-    const px = imageData.data;
-    
-    for (let i = 0; i < px.length; i += 4) {
-      let r = px[i];
-      let g = px[i + 1];
-      let b = px[i + 2];
-      r = (r - 128) * 0.4 + 128;
-      g = (g - 128) * 0.4 + 128;
-      b = (b - 128) * 0.4 + 128;
-      const gray = r * 0.3 + g * 0.59 + b * 0.11;
-      r = gray * -2.0 + r * 3.0;
-      g = gray * -2.0 + g * 3.0;
-      b = gray * -2.0 + b * 3.0;
-      r = (r - 128) * 1.7 + 128;
-      g = (g - 128) * 1.7 + 128;
-      b = (b - 128) * 1.7 + 128;
-      px[i] = r * 0.75;
-      px[i + 1] = g * 0.75;
-      px[i + 2] = b * 0.75;
+    this._compAspect = aspect;
+
+    if (!this._layout) this._randomizeLayout();
+    const L = this._layout;
+    const ctx = this._compCtx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.filter = 'saturate(1.4) contrast(1.05)';
+    this._drawClone(
+      ctx, src, iw, ih,
+      w / 2 + L.panX * w,
+      h / 2 + L.panY * h,
+      Math.max(w, h) * L.zoom,
+      0,
+      true,
+    );
+    ctx.filter = 'none';
+
+    const bg = ctx.getImageData(0, 0, w, h);
+    this._boxBlur(bg, Math.max(4, Math.round(Math.max(w, h) * 0.14)), 3, false);
+    ctx.putImageData(bg, 0, 0);
+
+    ctx.filter = 'saturate(1.4) contrast(1.05)';
+    const unit = Math.min(w, h);
+    for (const cl of L.clones) {
+      this._drawClone(ctx, src, iw, ih, cl.x * w, cl.y * h, cl.frac * unit, cl.rot, false);
     }
-    this._boxBlur(imageData, 2, 4, false);
+    ctx.filter = 'none';
+
+    const imageData = ctx.getImageData(0, 0, w, h);
+    this._boxBlur(imageData, Math.max(2, Math.round(Math.max(w, h) * 0.055)), 4, false);
     return imageData;
+  }
+
+  _recompose() {
+    if (!this._srcEl || !this._states.length) return;
+    const imageData = this._composeArtwork(this._srcEl);
+    if (!imageData) return;
+    const s = this._states[this._states.length - 1];
+    s.texture.dispose();
+    s.texture = new _MGTexture(this._gl, imageData);
+    this._lastImage = imageData;
+    this._requestTick();
   }
 
   _loadRemote(url, isVideo, ctrl) {
@@ -1545,13 +1611,7 @@ export default class dybg {
           .then((resp) =>
             resp.ok ? resp.blob() : Promise.reject(new Error('bad status')),
           )
-          .then((blob) =>
-            createImageBitmap(blob, {
-              resizeWidth: _MGR_TEX_SIZE,
-              resizeHeight: _MGR_TEX_SIZE,
-              resizeQuality: 'low',
-            }),
-          )
+          .then((blob) => createImageBitmap(blob))
           .then((bitmap) => resolve(bitmap))
           .catch(() => loadViaElement());
       } else {
@@ -1572,6 +1632,7 @@ export default class dybg {
     if (empty) {
       this._noCover = true;
       this._lastImage = null;
+      this._srcEl = null;
       return;
     }
 
@@ -1597,7 +1658,9 @@ export default class dybg {
     }
     if (myId !== this._requestId) return;
 
-    const imageData = this._processImage(src);
+    this._srcEl = src;
+    this._randomizeLayout();
+    const imageData = this._composeArtwork(src);
     if (!imageData) return;
     if (myId !== this._requestId) return;
 
@@ -1616,6 +1679,10 @@ export default class dybg {
     const gl = this._gl;
     this._checkSize();
     if (!this._W || !this._H) return true;
+    if (this._layoutDirty) {
+      this._layoutDirty = false;
+      this._recompose();
+    }
 
     const deltaFactor = dt / 500;
     const latest = this._states[this._states.length - 1];
@@ -1891,6 +1958,10 @@ export default class dybg {
 
   randomize() {
     const s = this._states[this._states.length - 1];
+    if (this._srcEl && s) {
+      this._randomizeLayout();
+      this._recompose();
+    }
     if (!s) return;
     const preset =
       Math.random() > 0.8
