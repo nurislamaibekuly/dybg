@@ -982,6 +982,9 @@ export default class dybg {
     this._paused = false;
     this._playing = true;
     this._playbackT = 1;
+    // 1 = the captured `to` warp field, 0 = the flat `from` grid. Eased by
+    // pause()/resume(), see `_updateFlat`.
+    this._flatT = 1;
     this._breathAmount = 1;
     this._breathPeriod = _MG_BREATH_PERIOD;
     this._breathPos = 1;
@@ -1505,18 +1508,19 @@ export default class dybg {
       gl.uniform1f(this._meshUni.u_breathWarp, this._breathWarp);
       gl.uniform1f(this._meshUni.u_breathWave, this._breathWave);
       // warpMix stays at 1: the mesh always runs the from/to branch, and the
-      // `to` field's own animation is the flow/breathing above. transitionMix
-      // stays at 1 too, so the mesh is on the captured `to` field from the very
-      // first rendered frame.
+      // `to` field's own animation is the flow/breathing above.
       //
-      // It must NOT ride the fade-in. The captured fromPosition/toPosition pair
-      // is the before/after of Apple's album-art card flip, not two poses of a
-      // resting warp: from is the upright grid (2u-1, 1-2v) to within 0.0069.
-      // to is a fold-free warp of it, not a mirror: corr(from.y, to.y) = +0.929
-      // over all 1,089 captured vertices. Interpolating between them would walk
-      // the mesh through a near-flat state, so the mesh stays on `to`.
+      // transitionMix is what pause() drives: it eases 1 -> 0 over
+      // _MG_PLAYBACK_MS so the mesh flattens onto the upright `from` grid
+      // instead of freezing with its control-point warp still out, and back to
+      // 1 on resume. The from/to pair is the before/after of Apple's album-art
+      // card flip, not two poses of a resting warp: from is the upright grid
+      // (2u-1, 1-2v) to within 0.0069, to a fold-free warp of it with
+      // corr(from.y, to.y) = +0.929 over all 1,089 captured vertices. Walking
+      // through the near-flat state is exactly what pausing asks for here, and
+      // it must still never ride the fade-in.
       gl.uniform1f(this._meshUni.u_warpMix, 1.0);
-      gl.uniform1f(this._meshUni.u_transitionMix, 1.0);
+      gl.uniform1f(this._meshUni.u_transitionMix, _MG_EASE(this._flatT));
       s.texture.bind();
       s.mesh.draw();
 
@@ -1542,7 +1546,12 @@ export default class dybg {
     }
 
     gl.flush();
-    return canBeStatic && !this._breathRunning();
+    return canBeStatic && !this._breathRunning() && this._flatSettled();
+  }
+
+  // True once the mesh has finished flattening or un-flattening.
+  _flatSettled() {
+    return this._flatT === (this._playing ? 1 : 0);
   }
 
   _updatePlayback(dt) {
@@ -1560,6 +1569,18 @@ export default class dybg {
     const eased = _MG_EASE(this._playbackT);
     this._flowSpeed = this._flowTarget * eased;
     if (this._playbackT === 1) this._breathFade = 0;
+  }
+
+  // Eases the mesh between the warped `to` field and the flat `from` grid,
+  // on the same ramp as the playback fade so both settle on the same frame.
+  _updateFlat(dt) {
+    const target = this._playing ? 1 : 0;
+    if (this._flatT === target) return;
+    const direction = target > this._flatT ? 1 : -1;
+    this._flatT = Math.max(
+      0,
+      Math.min(1, this._flatT + (direction * dt) / _MG_PLAYBACK_MS),
+    );
   }
 
   _breathe(dt) {
@@ -1605,6 +1626,7 @@ export default class dybg {
     const dt = rawDt > 0 ? Math.min(rawDt, 200) : interval;
     this._lastFrame = now;
     this._updatePlayback(dt);
+    this._updateFlat(dt);
     this._breathe(dt);
     this._time += dt * this._flowSpeed;
 
