@@ -587,15 +587,15 @@ void main(){
 }
 `;
 
-// Final blit to the canvas. It samples the mesh pass with y flipped, so the
-// whole backdrop comes out upside down.
+// Final blit to the canvas. It samples the mesh pass with x and y flipped, so
+// the whole backdrop comes out mirrored and upside down.
 const _MGR_QUAD_FRAG = `
 precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
 uniform float u_alpha;
 void main(){
-  vec4 c = texture2D(u_texture, vec2(v_uv.x, 1.0 - v_uv.y));
+  vec4 c = texture2D(u_texture, vec2(1.0 - v_uv.x, 1.0 - v_uv.y));
   gl_FragColor = vec4(c.rgb, c.a * u_alpha);
 }
 `;
