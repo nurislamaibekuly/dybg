@@ -1,32 +1,27 @@
-
-
-
-
-
 export class MeshGradient {
   constructor(options = {}) {
     const {
-      container   = document.body,
-      colors      = ['#cc1122','#00cccc','#880022','#004444','#ee2244','#0099aa'],
-      background  = '#050506',
-      numBlobs    = 8,
-      blur        = 110,
-      speed       = 0.18,
-      saturation  = 2.5,
-      contrast    = 1.08,
-      brightness  = 0.78,
+      container = document.body,
+      colors = ['#cc1122', '#00cccc', '#880022', '#004444', '#ee2244', '#0099aa'],
+      background = '#050506',
+      numBlobs = 8,
+      blur = 110,
+      speed = 0.18,
+      saturation = 2.5,
+      contrast = 1.08,
+      brightness = 0.78,
     } = options;
 
-    this._colors     = colors.map(c => this._hexToRgb(c));
-    this._bgRgb      = this._hexToRgb(background);
-    this._numBlobs   = numBlobs;
-    this._blurPx     = blur;
-    this._speed      = speed;
+    this._colors = colors.map(c => this._hexToRgb(c));
+    this._bgRgb = this._hexToRgb(background);
+    this._numBlobs = numBlobs;
+    this._blurPx = blur;
+    this._speed = speed;
     this._saturation = saturation;
-    this._contrast   = contrast;
+    this._contrast = contrast;
     this._brightness = brightness;
-    this._animId     = null;
-    this._startTime  = 0;
+    this._animId = null;
+    this._startTime = 0;
     this._W = 0;
     this._H = 0;
 
@@ -35,26 +30,26 @@ export class MeshGradient {
       : document.querySelector(container);
     if (!this._container) throw new Error('MeshGradient: container not found');
 
-    
+
     this._root = document.createElement('div');
     this._root.style.cssText = `position:fixed;inset:0;overflow:hidden;background:${background};`;
     this._container.appendChild(this._root);
 
-    
+
     this._canvas = document.createElement('canvas');
     this._canvas.style.cssText = `position:absolute;inset:0;width:100%;height:100%;`;
     this._root.appendChild(this._canvas);
 
-    
+
     this._blobs = this._initBlobs();
 
-    
-    try { this._gl = this._canvas.getContext('webgl', { alpha: false, antialias: false }); } catch(_){}
+
+    try { this._gl = this._canvas.getContext('webgl', { alpha: false, antialias: false }); } catch (_) { }
     if (this._gl && !this._gl.isContextLost()) {
       this._initGL();
     } else {
       this._gl = null;
-      
+
       this._ctx2d = this._canvas.getContext('2d');
     }
 
@@ -64,42 +59,42 @@ export class MeshGradient {
   }
 
   _hexToRgb(hex) {
-    const h = hex.replace('#','');
+    const h = hex.replace('#', '');
     const n = parseInt(h.length === 3
-      ? h.split('').map(c=>c+c).join('')
+      ? h.split('').map(c => c + c).join('')
       : h, 16);
-    return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255];
+    return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
   }
 
   _initBlobs() {
     const blobs = [];
     for (let i = 0; i < this._numBlobs; i++) {
       blobs.push({
-        x:      Math.random(),
-        y:      Math.random(),
-        vx:     (Math.random() - 0.5) * 0.0003,
-        vy:     (Math.random() - 0.5) * 0.0003,
-        
-        px:     Math.random() * Math.PI * 2,
-        py:     Math.random() * Math.PI * 2,
-        fx:     0.15 + Math.random() * 0.25,  
-        fy:     0.12 + Math.random() * 0.22,  
-        ax:     0.08 + Math.random() * 0.18,  
-        ay:     0.06 + Math.random() * 0.16,  
-        cx:     0.1 + Math.random() * 0.8,    
-        cy:     0.1 + Math.random() * 0.8,    
-        size:   0.3 + Math.random() * 0.55,   
-        weight: 0.6 + Math.random() * 1.2,    
-        ci:     i % this._colors.length,       
+        x: Math.random(),
+        y: Math.random(),
+        vx: (Math.random() - 0.5) * 0.0003,
+        vy: (Math.random() - 0.5) * 0.0003,
+
+        px: Math.random() * Math.PI * 2,
+        py: Math.random() * Math.PI * 2,
+        fx: 0.15 + Math.random() * 0.25,
+        fy: 0.12 + Math.random() * 0.22,
+        ax: 0.08 + Math.random() * 0.18,
+        ay: 0.06 + Math.random() * 0.16,
+        cx: 0.1 + Math.random() * 0.8,
+        cy: 0.1 + Math.random() * 0.8,
+        size: 0.3 + Math.random() * 0.55,
+        weight: 0.6 + Math.random() * 1.2,
+        ci: i % this._colors.length,
       });
     }
     return blobs;
   }
 
   _resize() {
-    this._W = this._root.clientWidth  || window.innerWidth;
+    this._W = this._root.clientWidth || window.innerWidth;
     this._H = this._root.clientHeight || window.innerHeight;
-    this._canvas.width  = this._W;
+    this._canvas.width = this._W;
     this._canvas.height = this._H;
     const gl = this._gl;
     if (gl) {
@@ -109,7 +104,7 @@ export class MeshGradient {
     }
   }
 
-  
+
 
   _compileShader(src, type) {
     const gl = this._gl;
@@ -221,44 +216,44 @@ export class MeshGradient {
 
   _initGL() {
     const gl = this._gl;
-    const n  = this._numBlobs;
+    const n = this._numBlobs;
 
-    
+
     this._buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
 
-    
+
     this._blobProg = this._createProgram(this._vsSrc(), this._blobFsSrc(n));
     gl.useProgram(this._blobProg);
     const blobPos = gl.getAttribLocation(this._blobProg, 'a_pos');
     gl.enableVertexAttribArray(blobPos);
     gl.vertexAttribPointer(blobPos, 2, gl.FLOAT, false, 0, 0);
-    this._uAspect   = gl.getUniformLocation(this._blobProg, 'u_aspect');
-    this._uBg       = gl.getUniformLocation(this._blobProg, 'u_bg');
-    this._uColors   = [];
-    this._uPos      = [];
-    this._uSize     = [];
-    this._uWeight   = [];
+    this._uAspect = gl.getUniformLocation(this._blobProg, 'u_aspect');
+    this._uBg = gl.getUniformLocation(this._blobProg, 'u_bg');
+    this._uColors = [];
+    this._uPos = [];
+    this._uSize = [];
+    this._uWeight = [];
     for (let i = 0; i < n; i++) {
       this._uColors.push(gl.getUniformLocation(this._blobProg, `u_colors[${i}]`));
-      this._uPos.push(   gl.getUniformLocation(this._blobProg, `u_pos[${i}]`));
-      this._uSize.push(  gl.getUniformLocation(this._blobProg, `u_size[${i}]`));
+      this._uPos.push(gl.getUniformLocation(this._blobProg, `u_pos[${i}]`));
+      this._uSize.push(gl.getUniformLocation(this._blobProg, `u_size[${i}]`));
       this._uWeight.push(gl.getUniformLocation(this._blobProg, `u_weight[${i}]`));
     }
 
-    
+
     this._kawaseProg = this._createProgram(this._vsSrc(), this._kawaseFsSrc());
     gl.useProgram(this._kawaseProg);
     const kPos = gl.getAttribLocation(this._kawaseProg, 'a_pos');
     gl.enableVertexAttribArray(kPos);
     gl.vertexAttribPointer(kPos, 2, gl.FLOAT, false, 0, 0);
-    this._kTex    = gl.getUniformLocation(this._kawaseProg, 'u_tex');
-    this._kTexel  = gl.getUniformLocation(this._kawaseProg, 'u_texel');
-    this._kIter   = gl.getUniformLocation(this._kawaseProg, 'u_iter');
+    this._kTex = gl.getUniformLocation(this._kawaseProg, 'u_tex');
+    this._kTexel = gl.getUniformLocation(this._kawaseProg, 'u_texel');
+    this._kIter = gl.getUniformLocation(this._kawaseProg, 'u_iter');
     gl.uniform1i(this._kTex, 0);
 
-    
+
     this._postProg = this._createProgram(this._vsSrc(), this._postFsSrc());
     gl.useProgram(this._postProg);
     const pPos = gl.getAttribLocation(this._postProg, 'a_pos');
@@ -270,7 +265,7 @@ export class MeshGradient {
     this._pBri = gl.getUniformLocation(this._postProg, 'u_bri');
     gl.uniform1i(this._pTex, 0);
 
-    
+
     this._blobTex = this._mkTex(1, 1);
     this._blobFBO = this._mkFBO(this._blobTex, 1, 1);
 
@@ -280,7 +275,7 @@ export class MeshGradient {
 
   _mkTex(w, h) {
     const gl = this._gl;
-    const t  = gl.createTexture();
+    const t = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -309,28 +304,28 @@ export class MeshGradient {
     const gl = this._gl;
     if (!gl) return;
 
-    
+
     const bw = Math.max(1, Math.round(this._W / 2));
     const bh = Math.max(1, Math.round(this._H / 2));
     if (!this._blobTex) { this._blobTex = this._mkTex(bw, bh); this._blobFBO = this._mkFBO(this._blobTex, bw, bh); }
     else this._resizeTex(this._blobTex, bw, bh);
     this._blobW = bw; this._blobH = bh;
 
-    
+
     if (this._fboATex) { gl.deleteTexture(this._fboATex); gl.deleteFramebuffer(this._fboA); }
     if (this._fboBTex) { gl.deleteTexture(this._fboBTex); gl.deleteFramebuffer(this._fboB); }
     this._fboATex = this._mkTex(this._fboW, this._fboH);
-    this._fboA    = this._mkFBO(this._fboATex, this._fboW, this._fboH);
+    this._fboA = this._mkFBO(this._fboATex, this._fboW, this._fboH);
     this._fboBTex = this._mkTex(this._fboW, this._fboH);
-    this._fboB    = this._mkFBO(this._fboBTex, this._fboW, this._fboH);
+    this._fboB = this._mkFBO(this._fboBTex, this._fboW, this._fboH);
   }
 
-  
+
 
   _updateBlobs(t) {
     const s = this._speed;
     for (const b of this._blobs) {
-      
+
       b.x = b.cx + Math.sin(t * b.fx + b.px) * b.ax;
       b.y = b.cy + Math.cos(t * b.fy + b.py) * b.ay;
     }
@@ -338,10 +333,10 @@ export class MeshGradient {
 
   _renderGL(t) {
     const gl = this._gl;
-    const n  = this._numBlobs;
+    const n = this._numBlobs;
     const aspect = this._W / this._H;
 
-    
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._blobFBO);
     gl.viewport(0, 0, this._blobW, this._blobH);
     gl.useProgram(this._blobProg);
@@ -351,13 +346,13 @@ export class MeshGradient {
       const b = this._blobs[i];
       const c = this._colors[b.ci];
       gl.uniform3fv(this._uColors[i], c);
-      gl.uniform2f(this._uPos[i],   b.x, b.y);
-      gl.uniform1f(this._uSize[i],  b.size);
+      gl.uniform2f(this._uPos[i], b.x, b.y);
+      gl.uniform1f(this._uSize[i], b.size);
       gl.uniform1f(this._uWeight[i], b.weight);
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    
+
     const numPasses = Math.max(0, Math.round(this._blurPx / 7));
     let readTex = this._blobTex;
     let writeFbo = this._fboA;
@@ -381,7 +376,7 @@ export class MeshGradient {
       readW = this._fboW; readH = this._fboH;
     }
 
-    
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this._W, this._H);
     gl.useProgram(this._postProg);
@@ -394,18 +389,18 @@ export class MeshGradient {
   }
 
   _render2D(t) {
-    
+
     const ctx = this._ctx2d;
     const W = this._W, H = this._H;
     const bg = this._bgRgb;
-    ctx.fillStyle = `rgb(${Math.round(bg[0]*255)},${Math.round(bg[1]*255)},${Math.round(bg[2]*255)})`;
+    ctx.fillStyle = `rgb(${Math.round(bg[0] * 255)},${Math.round(bg[1] * 255)},${Math.round(bg[2] * 255)})`;
     ctx.fillRect(0, 0, W, H);
     for (const b of this._blobs) {
       const c = this._colors[b.ci];
       const x = b.x * W, y = b.y * H;
       const r = b.size * Math.max(W, H) * 0.6;
       const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, `rgba(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)},0.8)`);
+      grad.addColorStop(0, `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},0.8)`);
       grad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
@@ -417,19 +412,19 @@ export class MeshGradient {
     const t = (now - this._startTime) * 0.001 * this._speed;
     this._updateBlobs(t);
     if (this._gl) this._renderGL(t);
-    else          this._render2D(t);
+    else this._render2D(t);
     this._animId = requestAnimationFrame(ts => this._loop(ts));
   }
 
-  
 
-  get blur()  { return this._blurPx; }
+
+  get blur() { return this._blurPx; }
   set blur(v) { this._blurPx = Math.max(0, Math.min(200, v)); }
 
-  get speed()  { return this._speed; }
+  get speed() { return this._speed; }
   set speed(v) { this._speed = v; }
 
-  get saturation()  { return this._saturation; }
+  get saturation() { return this._saturation; }
   set saturation(v) { this._saturation = v; }
 
   get paused() { return this._animId === null; }
@@ -445,7 +440,7 @@ export class MeshGradient {
     }
   }
 
-  
+
   randomize() {
     this._blobs = this._initBlobs();
   }
@@ -475,50 +470,61 @@ const _MGR_EASE = (x) =>
 const _MGR_CLAMP01 = (v) => Math.max(0, Math.min(1, v));
 const _MG_COMP_LONG = 640;
 const _MG_PLAYBACK_MS = 1000;
+const _MG_TAU = Math.PI * 2;
+const _MG_BREATH_PERIOD = 40000;
+const _MG_BREATH_FADE = 2500;
 const _MG_EASE = (t) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-const _MG_FLAT_GRID = (w, h) => {
-  const v = new Float32Array(w * h * 9);
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) {
-      const o = (i + j * w) * 9;
-      v[o] = (i / (w - 1)) * 2 - 1;
-      v[o + 1] = (j / (h - 1)) * 2 - 1;
-      v[o + 2] = 1;
-      v[o + 3] = 1;
-      v[o + 4] = 1;
-      v[o + 5] = 0;
-      v[o + 6] = 2 / (w - 1);
-      v[o + 7] = 0;
-      v[o + 8] = 2 / (h - 1);
-    }
-  }
-  return v;
-};
-
-
-
-const _MGR_HERMITE = [
-  2, -2, 1, 1,
-  -3, 3, -2, -1,
-  0, 0, 1, 0,
-  1, 0, 0, 0,
-];
-
-
+// Vertex stage for the quad-union backdrop mesh. The grid/warp blend at the
+// bottom is the deformation recovered from Apple Music's MediaCoreUI
+// `pinch_vertex` (see ylscratch/gtrace/apple-music-212-findings.md):
+//
+//   warp  = (1 - warpMix) * 0.5 + 2.0            -> 2.5 .. 2.0
+//   grid  = (position - 0.5) * warp
+//   p     = mix(grid, mix(from, to, transitionMix), warpMix)
+//
+// `a_pos` is already the mesh's `2 * (uv - 0.5)`, so the same grid term is
+// `a_pos * 0.5 * warp`. `a_from` is the vertex's resting grid position and
+// `a_to` its warped counterpart; the animated flow and breathing ride on `to`,
+// which is where Apple's `toPosition` carries its motion.
 const _MGR_VERT = `
 precision mediump float;
 attribute vec2 a_pos;
 attribute vec3 a_color;
 attribute vec2 a_uv;
+attribute vec2 a_from;
+attribute vec2 a_to;
 varying vec3 v_color;
 varying vec2 v_uv;
 uniform float u_aspect;
+uniform float u_time;
+uniform float u_motion;
+uniform float u_breath;
+uniform float u_breathPhase;
+uniform float u_breathPosition;
+uniform float u_breathWarp;
+uniform float u_breathWave;
+uniform float u_warpMix;
+uniform float u_transitionMix;
 void main(){
   v_color = a_color;
   v_uv = a_uv;
-  vec2 pos = a_pos;
+  float phase = u_time * 0.001;
+  float amplitude = 0.045 * u_motion;
+  vec2 flow = vec2(0.0);
+  flow.x += sin(a_pos.y * 2.7 + phase) * amplitude;
+  flow.x += sin(a_pos.y * 5.1 - phase * 0.63) * amplitude * 0.28;
+  flow.y += sin(a_pos.x * 2.2 - phase * 0.82) * amplitude * 0.8;
+  flow.y += sin(a_pos.x * 4.3 + phase * 0.51) * amplitude * 0.22;
+  float breath = cos(u_breathPhase + (a_pos.x + a_pos.y) * (1.15 + u_breathWave));
+  vec2 to = a_to + flow;
+  to *= 1.0 + breath * u_breath * u_breathWarp * 0.025;
+  to += vec2(sin(u_breathPhase + a_pos.y), cos(u_breathPhase + a_pos.x))
+    * u_breath * u_breathPosition * 0.018;
+  float warp = (1.0 - u_warpMix) * 0.5 + 2.0;
+  vec2 grid = a_pos * (0.5 * warp);
+  vec2 pos = mix(grid, mix(a_from, to, u_transitionMix), u_warpMix);
   if (u_aspect > 1.0) {
     pos.y *= u_aspect;
   } else {
@@ -622,54 +628,205 @@ function _mgProgram(gl, vsSrc, fsSrc, label) {
 
 
 
-class MGHermiteMesh {
-  constructor(gl, attrPos, attrColor, attrUV) {
+// Vertex stride: a_pos(2) a_color(3) a_uv(2) a_from(2) a_to(2).
+const _MG_MESH_FLOATS = 11;
+// 33x33 control points == the 1,089-vertex 32x32 cell mesh in the Music trace.
+const _MG_MESH_CONTROLS = 33;
+
+// Apple Music's backdrop mesh geometry, from MediaCoreUI's static control-point
+// tables (see ~/ylscratch/gtrace/apple-music-212-findings.md, section 9). A
+// layout draws one of the five "wide" warp cases uniformly at random, as Apple's
+// `Int.random(in: 0..<5)` does. Each case is a 9x9 control lattice for the `to`
+// field, with `from` the same for every case: the plain grid, with a 0.005
+// separable ripple. Two quad-union subdivision levels take each lattice to the
+// 33x33 mesh the Music trace captured. Lattice coordinates are in [0, 1].
+const _MG_WARP_FROM = [
+      [0.0000, 0.0000], [0.1300, 0.0000], [0.2500, 0.0000], [0.3800, 0.0000], [0.5000, 0.0000], [0.6300, 0.0000], [0.7500, 0.0000], [0.8800, 0.0000], [1.0000, 0.0000],
+      [0.0000, 0.1300], [0.1300, 0.1300], [0.2500, 0.1300], [0.3800, 0.1300], [0.5000, 0.1300], [0.6300, 0.1300], [0.7500, 0.1300], [0.8800, 0.1300], [1.0000, 0.1300],
+      [0.0000, 0.2500], [0.1300, 0.2500], [0.2500, 0.2500], [0.3800, 0.2500], [0.5000, 0.2500], [0.6300, 0.2500], [0.7500, 0.2500], [0.8800, 0.2500], [1.0000, 0.2500],
+      [0.0000, 0.3800], [0.1300, 0.3800], [0.2500, 0.3800], [0.3800, 0.3800], [0.5000, 0.3800], [0.6300, 0.3800], [0.7500, 0.3800], [0.8800, 0.3800], [1.0000, 0.3800],
+      [0.0000, 0.5000], [0.1300, 0.5000], [0.2500, 0.5000], [0.3800, 0.5000], [0.5000, 0.5000], [0.6300, 0.5000], [0.7500, 0.5000], [0.8800, 0.5000], [1.0000, 0.5000],
+      [0.0000, 0.6300], [0.1300, 0.6300], [0.2500, 0.6300], [0.3800, 0.6300], [0.5000, 0.6300], [0.6300, 0.6300], [0.7500, 0.6300], [0.8800, 0.6300], [1.0000, 0.6300],
+      [0.0000, 0.7500], [0.1300, 0.7500], [0.2500, 0.7500], [0.3800, 0.7500], [0.5000, 0.7500], [0.6300, 0.7500], [0.7500, 0.7500], [0.8800, 0.7500], [1.0000, 0.7500],
+      [0.0000, 0.8800], [0.1300, 0.8800], [0.2500, 0.8800], [0.3800, 0.8800], [0.5000, 0.8800], [0.6300, 0.8800], [0.7500, 0.8800], [0.8800, 0.8800], [1.0000, 0.8800],
+      [0.0000, 1.0000], [0.1300, 1.0000], [0.2500, 1.0000], [0.3800, 1.0000], [0.5000, 1.0000], [0.6300, 1.0000], [0.7500, 1.0000], [0.8800, 1.0000], [1.0000, 1.0000],
+];
+
+const _MG_WARP_TO = [
+  [  // case 0
+      [-0.2292, -0.0529], [-0.0402, -0.1270], [0.1116, -0.3122], [0.0923, -0.3360], [1.1205, -0.1640], [1.0089, -0.0635], [1.1205, -0.0529], [1.1116, -0.0899], [1.1979, -0.0741],
+      [-0.2202, 0.2685], [0.0238, 0.1435], [0.0997, 0.0933], [0.0774, 0.1091], [0.7500, 0.0933], [0.7738, 0.1091], [0.7991, 0.1435], [1.2798, 0.0880], [1.1801, 0.1435],
+      [-0.1667, 0.3611], [0.0432, 0.2500], [0.1116, 0.2500], [0.0923, 0.2791], [0.5387, 0.2791], [0.5908, 0.3161], [0.6250, 0.3161], [0.9896, 0.2791], [1.0893, 0.2341],
+      [-0.1176, 0.4544], [0.0625, 0.3909], [0.1503, 0.4418], [0.1637, 0.4306], [0.4836, 0.3909], [0.6161, 0.4544], [0.6458, 0.4544], [0.7411, 0.3909], [1.0640, 0.3380],
+      [-0.0625, 0.5344], [0.0997, 0.5159], [0.2664, 0.5721], [0.2589, 0.5721], [0.4836, 0.5344], [0.7113, 0.5344], [0.7411, 0.5344], [0.7991, 0.5159], [1.0461, 0.5000],
+      [-0.0402, 0.6574], [0.3750, 0.7130], [0.3929, 0.6574], [0.3750, 0.6250], [0.5000, 0.6038], [0.7991, 0.5721], [0.8080, 0.6250], [0.8750, 0.6250], [1.0461, 0.6435],
+      [-0.0298, 0.7685], [0.3586, 0.9041], [0.4063, 0.8003], [0.4568, 0.7500], [0.6250, 0.6574], [0.8616, 0.6700], [0.8408, 0.7130], [0.8943, 0.7288], [1.1265, 0.8214],
+      [-0.0402, 0.9041], [0.2589, 1.0152], [0.4747, 0.9676], [0.4568, 0.8882], [0.7411, 0.8538], [0.8616, 0.8538], [0.8408, 0.8750], [0.9211, 0.9438], [1.1116, 0.9676],
+      [-0.0625, 1.0979], [0.0238, 1.2196], [0.3304, 1.0688], [0.3750, 1.0000], [0.7887, 1.0556], [0.8408, 1.0556], [0.8750, 1.0688], [0.9435, 1.0688], [1.0893, 1.2196],
+  ],
+  [  // case 1
+      [-0.1726, -0.1984], [0.0551, -0.2593], [0.2158, -0.2593], [0.3839, -0.1984], [0.5119, -0.1984], [0.6473, -0.1243], [0.7440, -0.2698], [1.0179, -0.4259], [1.2515, -0.2698],
+      [0.0000, 0.0562], [0.1250, 0.1971], [0.2381, 0.2679], [0.3750, 0.2917], [0.5000, 0.2202], [0.6250, 0.1250], [0.8467, -0.1111], [1.0000, -0.1528], [1.1042, 0.0146],
+      [-0.0193, 0.0357], [0.1250, 0.1766], [0.2500, 0.2500], [0.3750, 0.3082], [0.5000, 0.2500], [0.6250, 0.1766], [0.7887, 0.0146], [0.9598, -0.0648], [1.0551, -0.0172],
+      [0.0000, 0.3353], [0.1250, 0.3896], [0.2167, 0.3444], [0.3750, 0.3231], [0.5119, 0.3772], [0.6250, 0.3353], [0.7768, 0.1025], [0.9464, 0.0562], [1.0685, 0.1647],
+      [-0.0521, 0.5192], [0.1250, 0.4471], [0.2229, 0.3824], [0.3750, 0.3444], [0.5119, 0.3933], [0.6577, 0.4353], [0.7500, 0.4677], [0.8601, 0.4353], [1.1473, 0.2345],
+      [-0.0402, 0.6442], [0.1250, 0.5192], [0.2277, 0.4000], [0.3750, 0.3664], [0.5119, 0.4074], [0.6577, 0.4677], [0.7500, 0.5000], [0.8527, 0.4471], [1.1280, 0.2345],
+      [-0.0253, 0.7718], [0.1116, 0.5675], [0.2339, 0.4353], [0.3708, 0.4219], [0.5148, 0.4353], [0.6726, 0.5000], [0.7649, 0.5780], [0.8601, 0.5357], [1.1622, 0.3082],
+      [-0.0253, 0.9041], [0.0982, 0.7718], [0.2381, 0.6872], [0.3750, 0.6442], [0.5119, 0.6442], [0.6577, 0.6872], [0.8229, 0.7348], [0.8750, 0.8750], [1.2411, 1.1343],
+      [-0.0521, 1.1005], [0.0982, 1.0556], [0.2277, 1.0556], [0.3557, 1.0556], [0.5000, 1.1587], [0.6250, 1.1799], [0.7649, 1.3677], [0.8958, 1.4841], [1.0685, 1.3519],
+  ],
+  [  // case 2
+      [-0.0640, -0.1323], [0.0893, -0.1614], [0.2500, -0.0608], [0.5729, -0.1614], [0.6771, -0.1614], [0.7292, -0.1614], [0.7634, -0.1217], [0.8750, -0.0608], [1.0164, -0.0423],
+      [-0.0714, 0.1091], [0.2054, 0.0985], [0.2292, 0.1091], [0.3750, 0.1250], [0.5357, 0.2077], [0.6131, 0.2500], [0.6458, 0.1250], [0.7500, -0.0284], [1.0164, 0.1091],
+      [-0.0565, 0.2500], [0.1696, 0.2077], [0.1771, 0.2262], [0.2143, 0.2262], [0.3750, 0.1759], [0.6250, 0.2937], [0.6369, 0.3161], [0.6652, 0.2262], [1.0104, 0.2262],
+      [-0.0565, 0.3750], [0.0997, 0.3750], [0.1250, 0.3750], [0.1771, 0.3882], [0.3616, 0.2077], [0.6131, 0.3406], [0.6548, 0.3406], [0.7068, 0.3750], [1.0313, 0.3538],
+      [-0.1429, 0.6058], [0.1414, 0.5000], [0.1563, 0.5000], [0.1949, 0.5000], [0.5193, 0.2937], [0.6964, 0.4517], [0.7158, 0.4517], [0.7902, 0.4841], [1.0461, 0.4841],
+      [-0.0714, 0.6753], [0.2054, 0.6250], [0.2054, 0.6250], [0.2292, 0.6250], [0.6131, 0.3750], [0.7158, 0.5298], [0.7634, 0.5456], [0.8557, 0.6250], [1.0789, 0.6250],
+      [-0.0565, 0.8108], [0.2143, 0.7500], [0.2292, 0.7500], [0.2500, 0.7315], [0.6652, 0.6865], [0.7634, 0.6462], [0.8095, 0.7077], [0.8914, 0.7500], [1.0923, 0.7500],
+      [-0.0565, 0.9306], [0.2054, 0.9067], [0.2054, 0.9306], [0.2292, 0.9411], [0.6250, 0.8750], [0.7634, 0.7718], [0.8557, 0.8108], [0.9390, 0.8538], [1.0789, 0.9306],
+      [0.0000, 1.0000], [-0.0714, 1.2169], [0.1250, 1.4021], [0.2500, 1.0794], [0.6250, 1.0794], [0.7902, 1.0794], [0.8750, 1.0794], [0.9509, 1.0582], [1.0104, 1.0794],
+  ],
+  [  // case 3
+      [-0.2292, -0.3968], [0.0699, -0.3439], [0.2217, -0.1799], [0.3512, -0.1376], [0.6533, -0.2407], [0.6845, -0.1640], [0.7753, -0.3148], [0.9494, -0.3677], [1.3810, -0.5476],
+      [-0.1711, 0.0827], [-0.0387, -0.1263], [0.2500, 0.1250], [0.2887, 0.1250], [0.5000, 0.1250], [0.5565, 0.1250], [0.7827, -0.0787], [0.9182, -0.1799], [1.2039, -0.0628],
+      [-0.1057, 0.2209], [0.0268, 0.1918], [0.2500, 0.2500], [0.2679, 0.2844], [0.2887, 0.2685], [0.3958, 0.2844], [0.6771, 0.1250], [0.9702, 0.0542], [1.2113, 0.1091],
+      [-0.1176, 0.2983], [0.1101, 0.3300], [0.2500, 0.4200], [0.3170, 0.4200], [0.3571, 0.4200], [0.3958, 0.4200], [0.6369, 0.2983], [0.9107, 0.2844], [1.2113, 0.3300],
+      [-0.1533, 0.3750], [0.1533, 0.3750], [0.2292, 0.4200], [0.3750, 0.5000], [0.4301, 0.5377], [0.4583, 0.5377], [0.6845, 0.4735], [0.8110, 0.4735], [1.1369, 0.4630],
+      [-0.0938, 0.5728], [0.1533, 0.4054], [0.3363, 0.5000], [0.4167, 0.5377], [0.5000, 0.6250], [0.5476, 0.6991], [0.7887, 0.6118], [0.8378, 0.5880], [1.1563, 0.5608],
+      [-0.0789, 0.7500], [0.2500, 0.5608], [0.3958, 0.5608], [0.4732, 0.6250], [0.5402, 0.7500], [0.5967, 0.7976], [0.8839, 0.7361], [0.8839, 0.7811], [1.1563, 0.6389],
+      [-0.1057, 0.9226], [0.1250, 0.8750], [0.2976, 0.8750], [0.4464, 0.8882], [0.5908, 0.9041], [0.6250, 0.8750], [0.9702, 0.9041], [1.0268, 1.0000], [1.1726, 1.0443],
+      [-0.0387, 1.1138], [0.0878, 1.1349], [0.2292, 1.1138], [0.4301, 1.1852], [0.6250, 1.2804], [0.6250, 1.3254], [1.0372, 1.2328], [0.9568, 1.2328], [1.0938, 1.2328],
+  ],
+  [  // case 4
+      [-0.0952, -0.1561], [0.0997, -0.1561], [0.2396, -0.0847], [0.3586, -0.0608], [0.4926, -0.0608], [0.6086, -0.1561], [0.7426, -0.1772], [0.8616, -0.1561], [1.0640, -0.2275],
+      [-0.0521, 0.0933], [-0.0521, 0.3062], [0.2708, 0.3750], [0.3750, 0.3485], [0.4926, 0.3062], [0.6250, 0.2335], [0.7500, 0.1250], [0.8750, -0.0337], [1.0640, -0.1772],
+      [-0.1250, 0.3611], [0.0789, 0.5000], [0.2827, 0.4147], [0.3824, 0.3750], [0.4926, 0.3300], [0.6250, 0.2500], [0.7500, 0.1812], [0.8988, 0.0146], [1.0804, -0.1230],
+      [-0.0952, 0.5119], [0.1518, 0.5344], [0.2827, 0.4683], [0.3824, 0.4147], [0.4926, 0.3750], [0.6250, 0.2851], [0.7589, 0.2163], [0.8988, 0.2335], [1.1190, 0.4147],
+      [-0.0521, 0.6250], [0.2827, 0.5344], [0.2961, 0.5985], [0.3646, 0.5119], [0.4926, 0.3995], [0.6324, 0.3062], [0.7589, 0.2619], [0.9286, 0.3062], [1.1071, 0.4683],
+      [-0.1399, 0.6938], [0.2902, 0.5721], [0.2604, 0.6759], [0.3586, 0.5344], [0.5000, 0.4286], [0.6414, 0.3300], [0.8006, 0.3062], [0.9673, 0.3750], [1.1190, 0.5985],
+      [-0.0521, 0.7897], [0.1920, 0.8294], [0.2500, 0.7500], [0.2708, 0.6759], [0.5000, 0.5119], [0.7738, 0.5589], [0.8988, 0.7315], [0.9286, 0.7130], [1.1190, 0.7500],
+      [-0.0685, 0.9438], [0.1518, 0.9438], [0.1979, 0.8750], [0.2500, 0.9570], [0.5000, 0.7718], [0.7738, 0.7315], [0.9360, 0.9755], [1.0000, 1.0205], [1.1726, 0.9570],
+      [-0.0283, 1.0873], [0.0997, 1.1561], [0.1250, 1.1799], [0.2604, 1.1243], [0.4926, 1.0688], [0.8006, 1.0873], [0.9167, 1.1376], [1.0313, 1.2698], [1.1548, 1.3228],
+  ],
+];
+
+// One quad-union level: insert edge midpoints and cell centres as plain
+// averages, then relax with a separable binomial pass (lambda = 1/2) that pins
+// only the four corners.
+function _mgSubdivide(A) {
+  const N = A.length;
+  const M = 2 * N - 1;
+  const B = Array.from({ length: M }, () => new Array(M));
+  const avg = (...ps) => [0, 1].map(k => ps.reduce((sum, p) => sum + p[k], 0) / ps.length);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) B[2 * j][2 * i] = A[j][i].slice();
+    for (let i = 0; i < N - 1; i++) B[2 * j][2 * i + 1] = avg(A[j][i], A[j][i + 1]);
+  }
+  for (let j = 0; j < N - 1; j++) {
+    for (let i = 0; i < N; i++) B[2 * j + 1][2 * i] = avg(A[j][i], A[j + 1][i]);
+    for (let i = 0; i < N - 1; i++)
+      B[2 * j + 1][2 * i + 1] = avg(A[j][i], A[j][i + 1], A[j + 1][i], A[j + 1][i + 1]);
+  }
+  const lam = 0.5;
+  const C = B.map(r => r.map(p => p.slice()));
+  for (let j = 0; j < M; j++)
+    for (let i = 1; i < M - 1; i++)
+      for (let k = 0; k < 2; k++)
+        C[j][i][k] = B[j][i][k] + lam * (0.5 * (B[j][i - 1][k] + B[j][i + 1][k]) - B[j][i][k]);
+  const D = C.map(r => r.map(p => p.slice()));
+  for (let i = 0; i < M; i++)
+    for (let j = 1; j < M - 1; j++)
+      for (let k = 0; k < 2; k++)
+        D[j][i][k] = C[j][i][k] + lam * (0.5 * (C[j - 1][i][k] + C[j + 1][i][k]) - C[j][i][k]);
+  return D;
+}
+
+// The 33x33 `[x, y]` grid (lattice coordinates in [0, 1], row-major by j) for one
+// field of one warp case: two subdivision levels from the 9x9 lattice.
+function _mgFieldGrid(lattice) {
+  let level = Array.from({ length: 9 }, (_, j) => lattice.slice(j * 9, j * 9 + 9));
+  level = _mgSubdivide(_mgSubdivide(level));
+  return level;
+}
+
+// Subdivided fields, built on first use: `from` is shared, `to` is per case.
+let _mgFromGrid = null;
+const _mgToGrids = [];
+
+function _mgWarpGrids(caseIndex) {
+  if (!_mgFromGrid) _mgFromGrid = _mgFieldGrid(_MG_WARP_FROM);
+  if (!_mgToGrids[caseIndex]) _mgToGrids[caseIndex] = _mgFieldGrid(_MG_WARP_TO[caseIndex]);
+  return { from: _mgFromGrid, to: _mgToGrids[caseIndex] };
+}
+
+class MGQuadUnionMesh {
+  constructor(gl, attrPos, attrColor, attrUV, attrFrom, attrTo, warpCase) {
     this.gl = gl;
     this.attrPos = attrPos;
     this.attrColor = attrColor;
     this.attrUV = attrUV;
-    this.cpW = 2;
-    this.cpH = 2;
-    this.sub = 40;
-    this.cp = new Float32Array(0); 
-    this.gW = 0;
-    this.gH = 0;
+    this.attrFrom = attrFrom;
+    this.attrTo = attrTo;
+    this._warpCase = warpCase;
+    this.cpW = 0;
+    this.cpH = 0;
+    this.cp = new Float32Array(0);
+    this._uvData = new Float32Array(0);
     this._vertGl = gl.createBuffer();
     this._idxGl = gl.createBuffer();
     this._vertData = new Float32Array(0);
     this._idxData = new Uint16Array(0);
     this._wire = false;
-    this.resizeControlPoints(2, 2);
+    this._buildGeometry();
+  }
+
+  // Builds the 33x33 control grid for warp case `this._warpCase`. Vertex i
+  // carries Apple's `from` and `to` positions for that case. The uv grid runs
+  // u = i/32 and v = j/32, and the control frame has y = -(trace y).
+  _buildGeometry() {
+    const { from, to } = _mgWarpGrids(this._warpCase);
+    const n = _MG_MESH_CONTROLS;
+    this.cpW = n;
+    this.cpH = n;
+    this.cp = new Float32Array(n * n * 9);
+    this._uvData = new Float32Array(n * n * 2);
+    this._vertData = new Float32Array(n * n * _MG_MESH_FLOATS);
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const index = i + j * n;
+        const offset = index * 9;
+        const fx = from[j][i][0] * 2 - 1;
+        const fy = -(from[j][i][1] * 2 - 1);
+        const tx = to[j][i][0] * 2 - 1;
+        const ty = -(to[j][i][1] * 2 - 1);
+        this.cp[offset] = fx;
+        this.cp[offset + 1] = fy;
+        this.cp[offset + 2] = 1;
+        this.cp[offset + 3] = 1;
+        this.cp[offset + 4] = 1;
+        this.cp[offset + 5] = 0;
+        this.cp[offset + 6] = 2 / (n - 1);
+        this.cp[offset + 7] = 0;
+        this.cp[offset + 8] = 2 / (n - 1);
+        this._uvData[index * 2] = i / (n - 1);
+        this._uvData[index * 2 + 1] = 1 - j / (n - 1);
+        const vertex = index * _MG_MESH_FLOATS;
+        this._vertData[vertex + 7] = fx;
+        this._vertData[vertex + 8] = fy;
+        this._vertData[vertex + 9] = tx;
+        this._vertData[vertex + 10] = ty;
+      }
+    }
+    this._buildIndices();
     this._rebuild();
   }
 
-  resizeControlPoints(width, height) {
-    const w = Math.max(2, width | 0);
-    const h = Math.max(2, height | 0);
-    this.cpW = w;
-    this.cpH = h;
-    const flat = new Float32Array(w * h * 9);
-    for (let j = 0; j < h; j++) {
-      for (let i = 0; i < w; i++) {
-        const o = (i + j * w) * 9;
-        flat[o] = (i / (w - 1)) * 2 - 1;
-        flat[o + 1] = (j / (h - 1)) * 2 - 1;
-        flat[o + 2] = 1;
-        flat[o + 3] = 1;
-        flat[o + 4] = 1;
-        flat[o + 5] = 0;
-        flat[o + 6] = 2 / (w - 1);
-        flat[o + 7] = 0;
-        flat[o + 8] = 2 / (h - 1);
-      }
-    }
-    this.cp = flat;
-    this._sizeBuffers();
+  resizeControlPoints() {
+    // Fixed at 33x33 to match Apple's mesh. Kept for the public API surface.
   }
 
-  resetSubdivition(sub) {
-    this.sub = Math.max(2, sub | 0);
-    this._sizeBuffers();
+  resetSubdivition() {
+    // Fixed at 33x33 to match Apple's mesh. Kept for the public API surface.
   }
 
   setWireFrame(on) {
@@ -678,45 +835,35 @@ class MGHermiteMesh {
     this._buildIndices();
   }
 
-  _sizeBuffers() {
-    let sub = this.sub;
-    let w = (this.cpW - 1) * sub;
-    let h = (this.cpH - 1) * sub;
-    
-    if (w * h > 65000) {
-      sub = Math.max(
-        2,
-        Math.floor(Math.sqrt(65000 / Math.max(1, (this.cpW - 1) * (this.cpH - 1)))),
-      );
-      w = (this.cpW - 1) * sub;
-      h = (this.cpH - 1) * sub;
-      this.sub = sub;
-    }
-    this.gW = w;
-    this.gH = h;
-    this._vertData = new Float32Array(w * h * 7);
-    this._buildIndices();
+  // Which way a cell's diagonal runs. The trace's rule is stated in the uv
+  // lattice, where v grows with the row index, while cp rows run the other way
+  // (cp row y has v = 1 - ys[y]); `cpH - 1 - y` is the uv row, so the returned
+  // parity is the captured one no matter how many control rows there are.
+  _quadUnionSplit(x, y) {
+    return ((x + this.cpH - 1 - y) & 1) === 0;
   }
 
   _buildIndices() {
-    const gl = this.gl;
-    const w = this.gW;
-    const h = this.gH;
-    const step = this._wire ? 10 : 6;
-    const idx = new Uint16Array((w - 1) * (h - 1) * step);
+    const cells = (this.cpW - 1) * (this.cpH - 1);
+    const idx = new Uint16Array(cells * (this._wire ? 8 : 6));
     let k = 0;
-    for (let j = 0; j < h - 1; j++) {
-      for (let i = 0; i < w - 1; i++) {
-        const a = j * w + i;
+    for (let y = 0; y < this.cpH - 1; y++) {
+      for (let x = 0; x < this.cpW - 1; x++) {
+        const a = y * this.cpW + x;
         const b = a + 1;
-        const c = a + w;
+        const c = a + this.cpW;
         const d = c + 1;
         if (this._wire) {
           idx[k++] = a; idx[k++] = b;
-          idx[k++] = b; idx[k++] = c;
-          idx[k++] = c; idx[k++] = d;
-          idx[k++] = d; idx[k++] = a;
-          idx[k++] = a; idx[k++] = c;
+          idx[k++] = b; idx[k++] = d;
+          idx[k++] = d; idx[k++] = c;
+          idx[k++] = c; idx[k++] = a;
+        } else if (this._quadUnionSplit(x, y)) {
+          // a-d ("\" in grid space). The captured Music mesh splits 512 cells
+          // each way and leaves interior vertices at degree 8 or 4 (481 / 480);
+          // a uniform split would put nearly all of them at degree 6.
+          idx[k++] = a; idx[k++] = b; idx[k++] = d;
+          idx[k++] = a; idx[k++] = d; idx[k++] = c;
         } else {
           idx[k++] = a; idx[k++] = b; idx[k++] = c;
           idx[k++] = b; idx[k++] = d; idx[k++] = c;
@@ -724,237 +871,77 @@ class MGHermiteMesh {
       }
     }
     this._idxData = idx;
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._idxGl);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this._idxGl);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, idx, this.gl.STATIC_DRAW);
   }
 
-  setControlPoint(cx, cy, v) {
-    const o = (cx + cy * this.cpW) * 9;
-    const cp = this.cp;
-    if (v.x !== undefined) cp[o] = v.x;
-    if (v.y !== undefined) cp[o + 1] = v.y;
-    if (v.r !== undefined) cp[o + 2] = v.r;
-    if (v.g !== undefined) cp[o + 3] = v.g;
-    if (v.b !== undefined) cp[o + 4] = v.b;
-    if (v.uAng !== undefined) cp[o + 5] = v.uAng;
-    if (v.uScale !== undefined) cp[o + 6] = v.uScale;
-    if (v.vAng !== undefined) cp[o + 7] = v.vAng;
-    if (v.vScale !== undefined) cp[o + 8] = v.vScale;
+  setControlPoint(x, y, values) {
+    const offset = (x + y * this.cpW) * 9;
+    for (const [key, index] of Object.entries({
+      x: 0, y: 1, r: 2, g: 3, b: 4,
+      uAng: 5, uScale: 6, vAng: 7, vScale: 8,
+    })) {
+      if (values[key] !== undefined) this.cp[offset + index] = values[key];
+    }
   }
 
   updateMesh() {
     this._rebuild();
   }
 
-  
-  controlPoint(cx, cy) {
+  controlPoint(x, y) {
     const mesh = this;
-    const o = (cx + cy * this.cpW) * 9;
-    return {
-      get x() { return mesh.cp[o]; },
-      set x(v) { mesh.cp[o] = v; },
-      get y() { return mesh.cp[o + 1]; },
-      set y(v) { mesh.cp[o + 1] = v; },
-      get r() { return mesh.cp[o + 2]; },
-      set r(v) { mesh.cp[o + 2] = v; },
-      get g() { return mesh.cp[o + 3]; },
-      set g(v) { mesh.cp[o + 3] = v; },
-      get b() { return mesh.cp[o + 4]; },
-      set b(v) { mesh.cp[o + 4] = v; },
-      get uAngle() { return mesh.cp[o + 5]; },
-      set uAngle(v) { mesh.cp[o + 5] = v; },
-      get uScale() { return mesh.cp[o + 6]; },
-      set uScale(v) { mesh.cp[o + 6] = v; },
-      get vAngle() { return mesh.cp[o + 7]; },
-      set vAngle(v) { mesh.cp[o + 7] = v; },
-      get vScale() { return mesh.cp[o + 8]; },
-      set vScale(v) { mesh.cp[o + 8] = v; },
-    };
+    const offset = (x + y * this.cpW) * 9;
+    const fields = ['x', 'y', 'r', 'g', 'b', 'uAngle', 'uScale', 'vAngle', 'vScale'];
+    const point = {};
+    fields.forEach((field, index) => {
+      Object.defineProperty(point, field, {
+        get: () => mesh.cp[offset + index],
+        set: value => { mesh.cp[offset + index] = value; },
+        enumerable: true,
+      });
+    });
+    return point;
   }
 
-  _readCp(cx, cy, out) {
-    const o = (cx + cy * this.cpW) * 9;
-    const cp = this.cp;
-    out.vx = cp[o];
-    out.vy = cp[o + 1];
-    out.r = cp[o + 2];
-    out.g = cp[o + 3];
-    out.b = cp[o + 4];
-    const ua = cp[o + 5];
-    const us = cp[o + 6];
-    const va = cp[o + 7];
-    const vs = cp[o + 8];
-    out.ux = Math.cos(ua) * us;
-    out.uy = Math.sin(ua) * us;
-    out.wx = -Math.sin(va) * vs;
-    out.wy = Math.cos(va) * vs;
-  }
-
-  
-  _hp4mul(a, b) {
-    const o = new Float32Array(16);
-    for (let c = 0; c < 4; c++) {
-      const b0 = b[c * 4], b1 = b[c * 4 + 1], b2 = b[c * 4 + 2], b3 = b[c * 4 + 3];
-      for (let r = 0; r < 4; r++) {
-        o[c * 4 + r] = a[r] * b0 + a[r + 4] * b1 + a[r + 8] * b2 + a[r + 12] * b3;
-      }
-    }
-    return o;
-  }
-
-  _hp4t(m) {
-    const t = new Float32Array(16);
-    for (let c = 0; c < 4; c++) {
-      for (let r = 0; r < 4; r++) t[c * 4 + r] = m[r * 4 + c];
-    }
-    return t;
-  }
-
-  
-  
   _rebuild() {
-    const gl = this.gl;
-    const W = this.cpW;
-    const H = this.cpH;
-    const sub = this.sub;
-    const subM1 = sub - 1;
-    const tW = subM1 * (H - 1);
-    const tH = subM1 * (W - 1);
-    const invTW = 1 / tW;
-    const invTH = 1 / tH;
-    const gW = this.gW;
-    const gH = this.gH;
-    const vd = this._vertData;
-
-    const bl = { vx: 0, vy: 0, r: 0, g: 0, b: 0, ux: 0, uy: 0, wx: 0, wy: 0 };
-    const br = Object.assign({}, bl);
-    const tl = Object.assign({}, bl);
-    const tr = Object.assign({}, bl);
-
-    
-    const P = new Float32Array(sub * 4);
-    for (let i = 0; i < sub; i++) {
-      const t = i / subM1;
-      const o = i * 4;
-      P[o] = t * t * t;
-      P[o + 1] = t * t;
-      P[o + 2] = t;
-      P[o + 3] = 1;
+    const vertices = this._vertData;
+    for (let i = 0; i < this.cpW * this.cpH; i++) {
+      const cp = i * 9;
+      const vertex = i * _MG_MESH_FLOATS;
+      vertices[vertex] = this.cp[cp];
+      vertices[vertex + 1] = this.cp[cp + 1];
+      vertices[vertex + 2] = this.cp[cp + 2];
+      vertices[vertex + 3] = this.cp[cp + 3];
+      vertices[vertex + 4] = this.cp[cp + 4];
+      vertices[vertex + 5] = this._uvData[i * 2];
+      vertices[vertex + 6] = this._uvData[i * 2 + 1];
     }
-
-    const Hm = _MGR_HERMITE;
-    const Ht = this._hp4t(Hm);
-
-    const Mx = new Float32Array(16);
-    const My = new Float32Array(16);
-    const Mr = new Float32Array(16);
-    const Mg = new Float32Array(16);
-    const Mb = new Float32Array(16);
-
-    const coeff = (getVal, getUT, getWT, out) => {
-      out[0] = getVal(bl); out[1] = getVal(tl); out[2] = getWT(bl); out[3] = getWT(tl);
-      out[4] = getVal(br); out[5] = getVal(tr); out[6] = getWT(br); out[7] = getWT(tr);
-      out[8] = getUT(bl); out[9] = getUT(tl); out[10] = 0; out[11] = 0;
-      out[12] = getUT(br); out[13] = getUT(tr); out[14] = 0; out[15] = 0;
-    };
-    const z = () => 0;
-
-    for (let x = 0; x < W - 1; x++) {
-      for (let y = 0; y < H - 1; y++) {
-        this._readCp(x, y, bl);
-        this._readCp(x + 1, y, br);
-        this._readCp(x, y + 1, tl);
-        this._readCp(x + 1, y + 1, tr);
-
-        coeff((p) => p.vx, (p) => p.ux, (p) => p.wx, Mx);
-        coeff((p) => p.vy, (p) => p.uy, (p) => p.wy, My);
-        coeff((p) => p.r, z, z, Mr);
-        coeff((p) => p.g, z, z, Mg);
-        coeff((p) => p.b, z, z, Mb);
-
-        
-        const pre = (M) => {
-          const t1 = this._hp4mul(this._hp4t(M), Hm);
-          return this._hp4mul(Ht, t1);
-        };
-        const Tx = pre(Mx);
-        const Ty = pre(My);
-        const Tr = pre(Mr);
-        const Tg = pre(Mg);
-        const Tb = pre(Mb);
-
-        const baseVx = y * sub;
-        for (let u = 0; u < sub; u++) {
-          const vxOff = baseVx + u;
-          const uo = u * 4;
-          const u3 = P[uo], u2 = P[uo + 1], u1 = P[uo + 2], u0 = P[uo + 3];
-
-          
-          const ux = [0, 0, 0, 0];
-          const uy = [0, 0, 0, 0];
-          const ur = [0, 0, 0, 0];
-          const ug = [0, 0, 0, 0];
-          const ub = [0, 0, 0, 0];
-          for (let k = 0; k < 4; k++) {
-            ux[k] = u3 * Tx[k] + u2 * Tx[4 + k] + u1 * Tx[8 + k] + u0 * Tx[12 + k];
-            uy[k] = u3 * Ty[k] + u2 * Ty[4 + k] + u1 * Ty[8 + k] + u0 * Ty[12 + k];
-            ur[k] = u3 * Tr[k] + u2 * Tr[4 + k] + u1 * Tr[8 + k] + u0 * Tr[12 + k];
-            ug[k] = u3 * Tg[k] + u2 * Tg[4 + k] + u1 * Tg[8 + k] + u0 * Tg[12 + k];
-            ub[k] = u3 * Tb[k] + u2 * Tb[4 + k] + u1 * Tb[8 + k] + u0 * Tb[12 + k];
-          }
-
-          for (let v = 0; v < sub; v++) {
-            const vy = x * sub + v;
-            const vo = v * 4;
-            const v3 = P[vo], v2 = P[vo + 1], v1 = P[vo + 2], v0 = P[vo + 3];
-            
-            const px = v3 * ux[0] + v2 * ux[1] + v1 * ux[2] + v0 * ux[3];
-            const py = v3 * uy[0] + v2 * uy[1] + v1 * uy[2] + v0 * uy[3];
-            const pr = v3 * ur[0] + v2 * ur[1] + v1 * ur[2] + v0 * ur[3];
-            const pg = v3 * ug[0] + v2 * ug[1] + v1 * ug[2] + v0 * ug[3];
-            const pb = v3 * ub[0] + v2 * ub[1] + v1 * ub[2] + v0 * ub[3];
-
-            const o = (vy * gW + vxOff) * 7;
-            vd[o] = px;
-            vd[o + 1] = py;
-            vd[o + 2] = pr;
-            vd[o + 3] = pg;
-            vd[o + 4] = pb;
-            vd[o + 5] = x / (W - 1) + v * invTH;
-            vd[o + 6] = 1 - (y / (H - 1) + u * invTW);
-          }
-        }
-      }
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._vertGl);
-    gl.bufferData(gl.ARRAY_BUFFER, vd, gl.DYNAMIC_DRAW);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this._vertGl);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.DYNAMIC_DRAW);
   }
 
   draw() {
     const gl = this.gl;
-    const stride = 7 * 4;
+    const stride = _MG_MESH_FLOATS * 4;
     gl.bindBuffer(gl.ARRAY_BUFFER, this._vertGl);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._idxGl);
-    if (this.attrPos !== undefined) {
-      gl.vertexAttribPointer(this.attrPos, 2, gl.FLOAT, false, stride, 0);
-      gl.enableVertexAttribArray(this.attrPos);
-    }
-    if (this.attrColor !== undefined) {
-      gl.vertexAttribPointer(this.attrColor, 3, gl.FLOAT, false, stride, 8);
-      gl.enableVertexAttribArray(this.attrColor);
-    }
-    if (this.attrUV !== undefined) {
-      gl.vertexAttribPointer(this.attrUV, 2, gl.FLOAT, false, stride, 20);
-      gl.enableVertexAttribArray(this.attrUV);
-    }
-    gl.drawElements(gl.TRIANGLES, this._idxData.length, gl.UNSIGNED_SHORT, 0);
+    const bind = (attr, size, offset) => {
+      if (attr === undefined || attr < 0) return;
+      gl.vertexAttribPointer(attr, size, gl.FLOAT, false, stride, offset);
+      gl.enableVertexAttribArray(attr);
+    };
+    bind(this.attrPos, 2, 0);
+    bind(this.attrColor, 3, 8);
+    bind(this.attrUV, 2, 20);
+    bind(this.attrFrom, 2, 28);
+    bind(this.attrTo, 2, 36);
+    gl.drawElements(this._wire ? gl.LINES : gl.TRIANGLES, this._idxData.length, gl.UNSIGNED_SHORT, 0);
   }
 
   dispose() {
-    const gl = this.gl;
-    if (this._vertGl) gl.deleteBuffer(this._vertGl);
-    if (this._idxGl) gl.deleteBuffer(this._idxGl);
+    if (this._vertGl) this.gl.deleteBuffer(this._vertGl);
+    if (this._idxGl) this.gl.deleteBuffer(this._idxGl);
     this._vertGl = null;
     this._idxGl = null;
   }
@@ -981,244 +968,6 @@ class _MGTexture {
 
 
 
-const _MGR_PRESETS = [
-  { width: 5, height: 5, points: [
-    [0, 0, -1, -1], [1, 0, -0.5, -1], [2, 0, 0, -1], [3, 0, 0.5, -1], [4, 0, 1, -1],
-    [0, 1, -1, -0.5], [1, 1, -0.5, -0.5],
-    [2, 1, -0.0052029684413368305, -0.6131420587090777],
-    [3, 1, 0.5884227308309977, -0.3990805107556692], [4, 1, 1, -0.5],
-    [0, 2, -1, 0], [1, 2, -0.4210024670505933, -0.11895058380429502],
-    [2, 2, -0.1019613423315412, -0.023812118047224606, 0, -47, 0.629, 0.849],
-    [3, 2, 0.40275125660925437, -0.06345314544600389], [4, 2, 1, 0],
-    [0, 3, -1, 0.5],
-    [1, 3, 0.06801958477287173, 0.5205913248960121, -31, -45, 1, 1],
-    [2, 3, 0.21446469120128908, 0.29331610114301043, 6, -56, 0.566, 1.321],
-    [3, 3, 0.5, 0.5], [4, 3, 1, 0.5],
-    [0, 4, -1, 1], [1, 4, -0.31378372841550195, 1], [2, 4, 0.26153633255328046, 1],
-    [3, 4, 0.5, 1], [4, 4, 1, 1],
-  ] },
-  { width: 4, height: 4, points: [
-    [0, 0, -1, -1], [1, 0, -0.33333333333333337, -1], [2, 0, 0.33333333333333326, -1], [3, 0, 1, -1],
-    [0, 1, -1, -0.04495399932657351],
-    [1, 1, -0.24056117520129328, -0.22465999020104],
-    [2, 1, 0.334758885767489, -0.00531297192779423],
-    [3, 1, 0.9989920470678106, -0.3382976020775408, 8, 0, 0.566, 1.792],
-    [0, 2, -1, 0.33333333333333326],
-    [1, 2, -0.3425497314639411, -0.000027501607956947893],
-    [2, 2, 0.3321437945812673, 0.1981776353859399],
-    [3, 2, 1, 0.0766118180296832],
-    [0, 3, -1, 1], [1, 3, -0.33333333333333337, 1], [2, 3, 0.33333333333333326, 1], [3, 3, 1, 1],
-  ] },
-  { width: 4, height: 4, points: [
-    [0, 0, -1, -1, 0, 0, 1, 2.075],
-    [1, 0, -0.33333333333333337, -1], [2, 0, 0.33333333333333326, -1], [3, 0, 1, -1],
-    [0, 1, -1, -0.4545779491139603],
-    [1, 1, -0.33333333333333337, -0.33333333333333337],
-    [2, 1, 0.0889403142626457, -0.6025711180694033, -32, 45, 1, 1],
-    [3, 1, 1, -0.33333333333333337],
-    [0, 2, -1, -0.07402408608567845, 1, 0, 1, 0.094],
-    [1, 2, -0.2719422694359541, 0.09775369930903222, 25, -18, 1.321, 0],
-    [2, 2, 0.19877414408395877, 0.4307383294587789, 48, -40, 0.755, 0.975],
-    [3, 2, 1, 0.33333333333333326, -37, 0, 1, 1],
-    [0, 3, -1, 1], [1, 3, -0.33333333333333337, 1],
-    [2, 3, 0.5125850864305672, 1, -20, -18, 0, 1.604], [3, 3, 1, 1],
-  ] },
-  { width: 5, height: 5, points: [
-    [0, 0, -1, -1], [1, 0, -0.4501953125, -1, 0, 55, 1, 2.075],
-    [2, 0, 0.1953125, -1], [3, 0, 0.4580078125, -1, 0, -25, 1, 1], [4, 0, 1, -1],
-    [0, 1, -1, -0.2514475377525607, -16, 0, 2.327, 0.943],
-    [1, 1, -0.55859375, -0.6609325945787148, 47, 0, 2.358, 0.377],
-    [2, 1, 0.232421875, -0.5244375756366635, -66, -25, 1.855, 1.164],
-    [3, 1, 0.685546875, -0.3753706470552125], [4, 1, 1, -0.6699125300354287],
-    [0, 2, -1, 0.035910396862284255],
-    [1, 2, -0.4921875, 0.005378616309457018, 90, 23, 1, 1.981],
-    [2, 2, 0.021484375, -0.1365043639066228, 0, 42, 1, 1],
-    [3, 2, 0.4765625, 0.05925822904974043, -30, 0, 1.95, 0.44],
-    [4, 2, 1, 0.251428847823418],
-    [0, 3, -1, 0.6968336464764276, -68, 0, 1, 0.786],
-    [1, 3, -0.6904296875, 0.5890744209958608, -68, 0, 1, 1],
-    [2, 3, 0.1845703125, 0.3879238667654693, 61, 0, 1, 1],
-    [3, 3, 0.60546875, 0.4633553246018661, -47, -59, 0.849, 1.73],
-    [4, 3, 1, 0.6214021886400309, -33, 0, 0.377, 1.604],
-    [0, 4, -1, 1], [1, 4, -0.5, 1, 0, -73, 1, 1],
-    [2, 4, -0.3271484375, 1, 0, -24, 0.314, 2.704],
-    [3, 4, 0.5, 1], [4, 4, 1, 1],
-  ] },
-  { width: 5, height: 5, points: [
-    [0, 0, -1, -1], [1, 0, -0.6393, -1, 0, 0, 1, 2.3884],
-    [2, 0, 0, -1], [3, 0, 0.5, -1], [4, 0, 1, -1],
-    [0, 1, -1, -0.2301],
-    [1, 1, -0.6934, -0.331, 0, -0.7188, 1, 1.063],
-    [2, 1, -0.0082, -0.6814, -0.2583, 0, 1.0964, 1],
-    [3, 1, 0.5836, -0.531, 0.7029, 0, 1.5466, 1],
-    [4, 1, 1, -0.6407],
-    [0, 2, -1, 0.2973, 0, 0, 1.8352, 1],
-    [1, 2, -0.4082, 0.0602],
-    [2, 2, -0.1803, -0.3646, -0.2998, 0, 1.1513, 1],
-    [3, 2, 0.477, -0.1027, 0.8903, -0.1882, 1.0807, 0.8551],
-    [4, 2, 1, -0.2973],
-    [0, 3, -1, 0.7628, 0, 0, 2.3868, 1],
-    [1, 3, -0.2525, 0.4814, -0.8406, -1.6199, 1.4093, 1.2215],
-    [2, 3, 0.3607, 0.2814, -1.0713, -0.0529, 1.0025, 0.7611],
-    [3, 3, 0.4885, 0.623, 0, 0.8184, 1, 1.2876],
-    [4, 3, 1, 0.5],
-    [0, 4, -1, 1], [1, 4, -0.4033, 1], [2, 4, 0.2672, 1], [3, 4, 0.5967, 1], [4, 4, 1, 1],
-  ] },
-  { width: 5, height: 5, points: [
-    [0, 0, -1, -1], [1, 0, -0.2197, -1], [2, 0, 0.0197, -1], [3, 0, 0.8033, -1], [4, 0, 1, -1],
-    [0, 1, -1, -0.5451],
-    [1, 1, -0.4885, -0.4035, -1.0246, -0.2268, 1.1936, 0.8005],
-    [2, 1, -0.1213, -0.2867, 0, -0.6981, 1, 0.809],
-    [3, 1, 0.3246, -0.5628, 0, -1.2188, 1, 1.044],
-    [4, 1, 1, -0.3292],
-    [0, 2, -1, 0.1416],
-    [1, 2, -0.341, -0.0142, 0, -0.4004, 1, 1.1293],
-    [2, 2, -0.0393, -0.023, 0.2915, -0.373, 1.044, 0.9879],
-    [3, 2, 0.3148, -0.0673, -0.7853, -0.8962, 1.4709, 1.0247],
-    [4, 2, 1, 0.1912],
-    [0, 3, -1, 0.5],
-    [1, 3, -0.2689, 0.2743, 0.3404, -0.5248, 1.0184, 0.4391],
-    [2, 3, 0.0721, 0.269, 0.5302, 0.1244, 0.6723, 0.3225],
-    [3, 3, 0.4148, 0.3894, -0.6977, -0.6783, 0.8094, 0.9247],
-    [4, 3, 1, 0.446],
-    [0, 4, -1, 1], [1, 4, -0.7311, 1], [2, 4, 0.323, 1], [3, 4, 0.6393, 1], [4, 4, 1, 1],
-  ] },
-];
-
-
-const _MGR_RANGE = (min, max) => Math.random() * (max - min) + min;
-function _mgSmoothstep(edge0, edge1, x) {
-  const t = _MGR_CLAMP01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
-}
-function _mgFract(x) {
-  return x - Math.floor(x);
-}
-function _mgNoise(x, y) {
-  return _mgFract(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453);
-}
-function _mgSmoothNoise(x, y) {
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const x1 = x0 + 1;
-  const y1 = y0 + 1;
-  const xf = x - x0;
-  const yf = y - y0;
-  const u = xf * xf * (3 - 2 * xf);
-  const v = yf * yf * (3 - 2 * yf);
-  const n00 = _mgNoise(x0, y0);
-  const n10 = _mgNoise(x1, y0);
-  const n01 = _mgNoise(x0, y1);
-  const n11 = _mgNoise(x1, y1);
-  const nx0 = n00 * (1 - u) + n10 * u;
-  const nx1 = n01 * (1 - u) + n11 * u;
-  return nx0 * (1 - v) + nx1 * v;
-}
-function _mgNoiseGradient(x, y, epsilon = 0.001) {
-  const n1 = _mgSmoothNoise(x + epsilon, y);
-  const n2 = _mgSmoothNoise(x - epsilon, y);
-  const n3 = _mgSmoothNoise(x, y + epsilon);
-  const n4 = _mgSmoothNoise(x, y - epsilon);
-  const ddx = (n1 - n2) / (2 * epsilon);
-  const ddy = (n3 - n4) / (2 * epsilon);
-  const len = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
-  return [ddx / len, ddy / len];
-}
-function _mgSmoothify(points, w, h, iterations, factor, factorModifier) {
-  let grid = [];
-  for (let j = 0; j < h; j++) grid[j] = [];
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) grid[j][i] = points[j * w + i];
-  }
-  const kernel = [1, 2, 1, 2, 4, 2, 1, 2, 1];
-  const ksum = 16;
-  let f = factor;
-  for (let it = 0; it < iterations; it++) {
-    const next = [];
-    for (let j = 0; j < h; j++) {
-      next[j] = [];
-      for (let i = 0; i < w; i++) {
-        if (i === 0 || i === w - 1 || j === 0 || j === h - 1) {
-          next[j][i] = grid[j][i];
-          continue;
-        }
-        const sx = [0, 0, 0, 0, 0, 0];
-        for (let dj = -1; dj <= 1; dj++) {
-          for (let di = -1; di <= 1; di++) {
-            const wgt = kernel[(dj + 1) * 3 + (di + 1)];
-            const nb = grid[j + dj][i + di];
-            sx[0] += nb[2] * wgt; 
-            sx[1] += nb[3] * wgt; 
-            sx[2] += nb[4] * wgt; 
-            sx[3] += nb[5] * wgt; 
-            sx[4] += nb[6] * wgt; 
-            sx[5] += nb[7] * wgt; 
-          }
-        }
-        const cur = grid[j][i];
-        next[j][i] = [
-          i, j,
-          cur[2] * (1 - f) + (sx[0] / ksum) * f,
-          cur[3] * (1 - f) + (sx[1] / ksum) * f,
-          cur[4] * (1 - f) + (sx[2] / ksum) * f,
-          cur[5] * (1 - f) + (sx[3] / ksum) * f,
-          cur[6] * (1 - f) + (sx[4] / ksum) * f,
-          cur[7] * (1 - f) + (sx[5] / ksum) * f,
-        ];
-      }
-    }
-    grid = next;
-    f = _MGR_CLAMP01(f + factorModifier);
-  }
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) points[j * w + i] = grid[j][i];
-  }
-}
-function generateControlPoints(width, height) {
-  const w = width || Math.floor(_MGR_RANGE(3, 6));
-  const h = height || Math.floor(_MGR_RANGE(3, 6));
-  const variationFraction = _MGR_RANGE(0.4, 0.6);
-  const normalOffset = _MGR_RANGE(0.3, 0.6);
-  const blendFactor = 0.8;
-  const smoothIters = Math.floor(_MGR_RANGE(3, 5));
-  const smoothFactor = _MGR_RANGE(0.2, 0.3);
-  const smoothModifier = _MGR_RANGE(-0.1, -0.05);
-  const dx = w === 1 ? 0 : 2 / (w - 1);
-  const dy = h === 1 ? 0 : 2 / (h - 1);
-  const conf = [];
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) {
-      const baseX = (w === 1 ? 0 : i / (w - 1)) * 2 - 1;
-      const baseY = (h === 1 ? 0 : j / (h - 1)) * 2 - 1;
-      const isBorder = i === 0 || i === w - 1 || j === 0 || j === h - 1;
-      let x =
-        baseX + (isBorder ? 0 : _MGR_RANGE(-variationFraction * dx, variationFraction * dx));
-      let y =
-        baseY + (isBorder ? 0 : _MGR_RANGE(-variationFraction * dy, variationFraction * dy));
-      let ur = isBorder ? 0 : _MGR_RANGE(-60, 60);
-      let vr = isBorder ? 0 : _MGR_RANGE(-60, 60);
-      let up = isBorder ? 1 : _MGR_RANGE(0.8, 1.2);
-      let vp = isBorder ? 1 : _MGR_RANGE(0.8, 1.2);
-      if (!isBorder) {
-        const uNorm = (baseX + 1) / 2;
-        const vNorm = (baseY + 1) / 2;
-        const nrm = _mgNoiseGradient(uNorm, vNorm, 0.001);
-        let offsetX = nrm[0] * normalOffset;
-        let offsetY = nrm[1] * normalOffset;
-        const distToBorder = Math.min(uNorm, 1 - uNorm, vNorm, 1 - vNorm);
-        const weight = _mgSmoothstep(0, 1.0, distToBorder);
-        offsetX *= weight;
-        offsetY *= weight;
-        x = x * (1 - blendFactor) + (x + offsetX) * blendFactor;
-        y = y * (1 - blendFactor) + (y + offsetY) * blendFactor;
-      }
-      conf.push([i, j, x, y, ur, vr, up, vp]);
-    }
-  }
-  _mgSmoothify(conf, w, h, smoothIters, smoothFactor, smoothModifier);
-  return { width: w, height: h, points: conf };
-}
-
 export default class dybg {
   constructor(canvas) {
     if (!canvas) throw new Error('dybg: canvas required');
@@ -1227,11 +976,19 @@ export default class dybg {
     this._flowSpeed = 1;
     this._flowTarget = 1;
     this._renderScale = 0.5;
+    this._blurScale = 1;
     this._staticMode = false;
     this._maxFPS = 60;
     this._paused = false;
     this._playing = true;
     this._playbackT = 1;
+    this._breathAmount = 1;
+    this._breathPeriod = _MG_BREATH_PERIOD;
+    this._breathPos = 1;
+    this._breathWarp = 1;
+    this._breathWave = 0;
+    this._breathPhase = Math.PI;
+    this._breathFade = 0;
     this._manual = false;
     this._volume = 0;
     this._smoothVolume = 0;
@@ -1261,6 +1018,7 @@ export default class dybg {
 
     this._srcEl = null;
     this._layout = null;
+    this._warpCase = null;
     this._layoutDirty = false;
     this._compAspect = 0;
     this._comp = document.createElement('canvas');
@@ -1291,7 +1049,12 @@ export default class dybg {
     this._meshProg = _mgProgram(gl, _MGR_VERT, _MGR_FRAG, 'mesh');
     this._quadProg = _mgProgram(gl, _MGR_QUAD_VERT, _MGR_QUAD_FRAG, 'quad');
     this._meshUni = {};
-    for (const n of ['u_aspect', 'u_texture', 'u_volume', 'u_alpha', 'u_sinAngle', 'u_cosAngle']) {
+    for (const n of [
+      'u_aspect', 'u_texture', 'u_volume', 'u_alpha', 'u_sinAngle', 'u_cosAngle',
+      'u_time', 'u_motion', 'u_breath', 'u_breathPhase',
+      'u_breathPosition', 'u_breathWarp', 'u_breathWave',
+      'u_warpMix', 'u_transitionMix',
+    ]) {
       this._meshUni[n] = gl.getUniformLocation(this._meshProg.prog, n);
     }
     this._quadUni = {};
@@ -1366,47 +1129,26 @@ export default class dybg {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  _applyPreset(mesh, preset) {
-    const uPow = 2 / (preset.width - 1);
-    const vPow = 2 / (preset.height - 1);
-    for (const pt of preset.points) {
-      mesh.setControlPoint(pt[0], pt[1], {
-        x: pt[2],
-        y: pt[3],
-        uAng: ((pt[4] || 0) * Math.PI) / 180,
-        vAng: ((pt[5] || 0) * Math.PI) / 180,
-        uScale: uPow * (pt[6] !== undefined ? pt[6] : 1),
-        vScale: vPow * (pt[7] !== undefined ? pt[7] : 1),
-      });
-    }
-    mesh.updateMesh();
-  }
-
-  _genPreset(w, h) {
-    return generateControlPoints(w, h);
-  }
-
   _makeState(imageData) {
     const gl = this._gl;
-    const mesh = new MGHermiteMesh(
+    // Pick the warp case once and keep it, so later tracks (and a restored
+    // context) get the same geometry and only the artwork changes.
+    if (this._warpCase === null) {
+      this._warpCase = Math.floor(Math.random() * _MG_WARP_TO.length);
+    }
+    const mesh = new MGQuadUnionMesh(
       gl,
       this._meshProg.attrs.a_pos,
       this._meshProg.attrs.a_color,
       this._meshProg.attrs.a_uv,
+      this._meshProg.attrs.a_from,
+      this._meshProg.attrs.a_to,
+      this._warpCase,
     );
-    mesh.resetSubdivition(50);
-    const preset =
-      Math.random() > 0.8
-        ? this._genPreset(6, 6)
-        : _MGR_PRESETS[(Math.random() * _MGR_PRESETS.length) | 0];
-    mesh.resizeControlPoints(preset.width, preset.height);
-    this._applyPreset(mesh, preset);
     return {
       mesh,
       texture: new _MGTexture(gl, imageData),
       alpha: 0,
-      waveCp: null,
-      flatCp: null,
     };
   }
 
@@ -1422,7 +1164,7 @@ export default class dybg {
     const cap = (v, n) => clampN(v, 0, n - 1);
 
     for (let it = 0; it < iterations; it++) {
-      
+
       for (let y = 0; y < height; y++) {
         let r = 0;
         let g = 0;
@@ -1452,7 +1194,7 @@ export default class dybg {
           a += src[oOut + 3] - src[oIn + 3];
         }
       }
-      
+
       for (let x = 0; x < width; x++) {
         let r = 0;
         let g = 0;
@@ -1492,12 +1234,12 @@ export default class dybg {
   }
 
   _randomizeLayout() {
+    // 4 clones max, all large. frac is relative to min(w, h).
     const fracs = [
-      this._rand(0.85, 1.0),
-      this._rand(0.6, 0.7),
-      this._rand(0.45, 0.55),
-      this._rand(0.33, 0.4),
-      this._rand(0.22, 0.3),
+      this._rand(0.95, 1.15),
+      this._rand(0.80, 0.95),
+      this._rand(0.70, 0.85),
+      this._rand(0.60, 0.75),
     ];
     this._layout = {
       zoom: this._rand(1.15, 1.35),
@@ -1505,8 +1247,8 @@ export default class dybg {
       panY: this._rand(-0.06, 0.06),
       clones: fracs.map((frac, i) => ({
         frac,
-        x: i === 0 ? this._rand(0.4, 0.6) : this._rand(0.15, 0.85),
-        y: i === 0 ? this._rand(0.4, 0.6) : this._rand(0.18, 0.82),
+        x: i === 0 ? this._rand(0.4, 0.6) : this._rand(0.2, 0.8),
+        y: i === 0 ? this._rand(0.4, 0.6) : this._rand(0.2, 0.8),
         rot: i === 0 ? this._rand(-0.5, 0.5) : this._rand(-Math.PI, Math.PI),
       })),
     };
@@ -1545,6 +1287,7 @@ export default class dybg {
 
     if (!this._layout) this._randomizeLayout();
     const L = this._layout;
+    L.aspect = aspect;
     const ctx = this._compCtx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
@@ -1560,8 +1303,13 @@ export default class dybg {
     ctx.filter = 'none';
 
     const bg = ctx.getImageData(0, 0, w, h);
-    this._boxBlur(bg, Math.max(4, Math.round(Math.max(w, h) * 0.14)), 3, false);
-    ctx.putImageData(bg, 0, 0);
+    const long = Math.max(w, h);
+    const bs = this._blurScale;
+    const bgRad = Math.round(Math.max(4, long * 0.14) * bs);
+    if (bgRad >= 1) {
+      this._boxBlur(bg, bgRad, 3, false);
+      ctx.putImageData(bg, 0, 0);
+    }
 
     ctx.filter = 'saturate(1.4) contrast(1.05)';
     const unit = Math.min(w, h);
@@ -1571,7 +1319,8 @@ export default class dybg {
     ctx.filter = 'none';
 
     const imageData = ctx.getImageData(0, 0, w, h);
-    this._boxBlur(imageData, Math.max(2, Math.round(Math.max(w, h) * 0.055)), 4, false);
+    const fgRad = Math.round(Math.max(2, long * 0.055) * bs);
+    if (fgRad >= 1) this._boxBlur(imageData, fgRad, 4, false);
     return imageData;
   }
 
@@ -1602,7 +1351,7 @@ export default class dybg {
           el.playsInline = true;
         }
         el.src = url;
-        if (isVideo) el.play().catch(() => {});
+        if (isVideo) el.play().catch(() => { });
       };
       if (isVideo || /^blob:/i.test(url)) {
         loadViaElement();
@@ -1639,7 +1388,7 @@ export default class dybg {
     let src = null;
     try {
       if (typeof source === 'string') {
-        
+
         for (let i = 0; i < 3 && src === null; i++) {
           const res = await this._loadRemote(source, isVideo, ctrl);
           if (res) {
@@ -1659,7 +1408,8 @@ export default class dybg {
     if (myId !== this._requestId) return;
 
     this._srcEl = src;
-    this._randomizeLayout();
+    // Keep the existing layout across tracks; only the first track rolls one.
+    if (!this._layout) this._randomizeLayout();
     const imageData = this._composeArtwork(src);
     if (!imageData) return;
     if (myId !== this._requestId) return;
@@ -1731,7 +1481,7 @@ export default class dybg {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     for (const s of this._states) {
-      
+
       gl.bindFramebuffer(gl.FRAMEBUFFER, this._fbo);
       gl.disable(gl.BLEND);
       gl.clearColor(0, 0, 0, 0);
@@ -1744,10 +1494,33 @@ export default class dybg {
       gl.uniform1f(this._meshUni.u_alpha, 1.0);
       gl.uniform1f(this._meshUni.u_sinAngle, sinA);
       gl.uniform1f(this._meshUni.u_cosAngle, cosA);
+      gl.uniform1f(this._meshUni.u_time, this._time);
+      gl.uniform1f(this._meshUni.u_motion, this._manual ? 0 : this._playbackT);
+      gl.uniform1f(
+        this._meshUni.u_breath,
+        this._manual ? 0 : this._breathAmount * this._breathFade,
+      );
+      gl.uniform1f(this._meshUni.u_breathPhase, this._breathPhase);
+      gl.uniform1f(this._meshUni.u_breathPosition, this._breathPos);
+      gl.uniform1f(this._meshUni.u_breathWarp, this._breathWarp);
+      gl.uniform1f(this._meshUni.u_breathWave, this._breathWave);
+      // warpMix stays at 1: the mesh always runs the from/to branch, and the
+      // `to` field's own animation is the flow/breathing above. transitionMix
+      // stays at 1 too, so the mesh is on the captured `to` field from the very
+      // first rendered frame.
+      //
+      // It must NOT ride the fade-in. The captured fromPosition/toPosition pair
+      // is the before/after of Apple's album-art card flip, not two poses of a
+      // resting warp: from is the upright grid (2u-1, 1-2v) to within 0.0069.
+      // to is a fold-free warp of it, not a mirror: corr(from.y, to.y) = +0.929
+      // over all 1,089 captured vertices. Interpolating between them would walk
+      // the mesh through a near-flat state, so the mesh stays on `to`.
+      gl.uniform1f(this._meshUni.u_warpMix, 1.0);
+      gl.uniform1f(this._meshUni.u_transitionMix, 1.0);
       s.texture.bind();
       s.mesh.draw();
 
-      
+
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.enable(gl.BLEND);
       gl.blendFuncSeparate(
@@ -1769,57 +1542,40 @@ export default class dybg {
     }
 
     gl.flush();
-    return canBeStatic;
+    return canBeStatic && !this._breathRunning();
   }
 
   _updatePlayback(dt) {
     if (this._manual || !this._states.length) return;
     const target = this._playing ? 1 : 0;
-    if (target === 1 && this._playbackT === 1) {
-      this._flowSpeed = this._flowTarget;
-      for (const s of this._states) {
-        s.waveCp = null;
-        s.flatCp = null;
-      }
+    if (target === this._playbackT) {
+      this._flowSpeed = target ? this._flowTarget : 0;
       return;
     }
-    if (target === 0 && this._playbackT === 0) {
-      this._flowSpeed = 0;
-      for (const s of this._states) {
-        if (s.waveCp) continue;
-        s.waveCp = s.mesh.cp.slice();
-        s.flatCp = _MG_FLAT_GRID(s.mesh.cpW, s.mesh.cpH);
-        s.mesh.cp.set(s.flatCp);
-        s.mesh._rebuild();
-      }
-      return;
-    }
-    const dir = target > this._playbackT ? 1 : -1;
-    const next = Math.min(1, Math.max(0, this._playbackT + (dir * dt) / _MG_PLAYBACK_MS));
-    if (next === this._playbackT) return;
-    this._playbackT = next;
+    const direction = target > this._playbackT ? 1 : -1;
+    this._playbackT = Math.max(
+      0,
+      Math.min(1, this._playbackT + (direction * dt) / _MG_PLAYBACK_MS),
+    );
     const eased = _MG_EASE(this._playbackT);
     this._flowSpeed = this._flowTarget * eased;
-    const doneResume = next === 1;
-    const donePause = next === 0;
-    const k = doneResume ? 1 : donePause ? 0 : eased;
-    for (const s of this._states) {
-      if (!s.waveCp) s.waveCp = s.mesh.cp.slice();
-      if (!s.flatCp) s.flatCp = _MG_FLAT_GRID(s.mesh.cpW, s.mesh.cpH);
-      const cp = s.mesh.cp;
-      const wf = s.waveCp;
-      const ff = s.flatCp;
-      for (let j = 0; j < cp.length; j++) {
-        cp[j] = ff[j] + (wf[j] - ff[j]) * k;
-      }
-      s.mesh._rebuild();
-    }
-    if (doneResume) {
-      for (const s of this._states) {
-        s.waveCp = null;
-        s.flatCp = null;
-      }
-    }
+    if (this._playbackT === 1) this._breathFade = 0;
+  }
+
+  _breathe(dt) {
+    if (!this._breathRunning()) return;
+    this._breathPhase =
+      (this._breathPhase + (_MG_TAU * dt) / this._breathPeriod) % _MG_TAU;
+    this._breathFade = Math.min(1, this._breathFade + dt / _MG_BREATH_FADE);
+  }
+
+  _breathRunning() {
+    return (
+      this._breathAmount > 0 &&
+      !this._manual &&
+      this._playbackT === 1 &&
+      this._states.length > 0
+    );
   }
 
   _tick = (now) => {
@@ -1849,6 +1605,7 @@ export default class dybg {
     const dt = rawDt > 0 ? Math.min(rawDt, 200) : interval;
     this._lastFrame = now;
     this._updatePlayback(dt);
+    this._breathe(dt);
     this._time += dt * this._flowSpeed;
 
     const staticOk = this._frame(this._time, dt);
@@ -1871,6 +1628,32 @@ export default class dybg {
 
   setRenderScale(scale) {
     this._renderScale = scale;
+    this._requestTick();
+  }
+
+  setBlur(scale) {
+    const v = Math.max(0, Math.min(3, Number(scale) || 0));
+    if (v === this._blurScale) return;
+    this._blurScale = v;
+    this._recompose();
+  }
+
+  // Controls the GPU-driven breathing layered over the flowing quad union.
+  setBreathing(amount, options = {}) {
+    const raw = amount === undefined ? this._breathAmount : Number(amount);
+    const previous = this._breathAmount;
+    this._breathAmount = Math.max(0, Math.min(1, Number.isFinite(raw) ? raw : 1));
+    if (previous <= 0 && this._breathAmount > 0) this._breathFade = 0;
+
+    const clamp = (value, lo, hi, fallback) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : fallback;
+    };
+    this._breathPeriod = clamp(options.period, 1200, 120000, this._breathPeriod);
+    this._breathPos = clamp(options.position, 0, 1, this._breathPos);
+    this._breathWarp = clamp(options.warp, 0, 1, this._breathWarp);
+    this._breathWave = clamp(options.wave, 0, _MG_TAU, this._breathWave);
+
     this._requestTick();
   }
 
@@ -1911,35 +1694,23 @@ export default class dybg {
     this._volume = volume / 10;
   }
 
-  setHasLyric() {}
+  setHasLyric() { }
 
   setManualControl(enable) {
+    const was = this._manual;
     this._manual = !!enable;
+    if (this._manual !== was) this._breathFade = 0;
+    this._requestTick();
   }
 
   setWireFrame(enable) {
     for (const s of this._states) s.mesh.setWireFrame(enable);
   }
 
-  resizeControlPoints(width, height) {
-    const s = this._states[this._states.length - 1];
-    if (!s) return;
-    s.mesh.resizeControlPoints(width, height);
-    s.waveCp = null;
-    s.flatCp = null;
-    if (!this._manual) s.mesh.updateMesh();
-    this._requestTick();
-  }
+  // The mesh is Apple's fixed 33x33 grid, so resizing and subdivision are no-ops.
+  resizeControlPoints() { }
 
-  resetSubdivition(sub) {
-    const s = this._states[this._states.length - 1];
-    if (!s) return;
-    s.mesh.resetSubdivition(sub);
-    s.waveCp = null;
-    s.flatCp = null;
-    if (!this._manual) s.mesh.updateMesh();
-    this._requestTick();
-  }
+  resetSubdivition() { }
 
   getControlPoint(x, y) {
     const s = this._states[this._states.length - 1];
@@ -1950,8 +1721,6 @@ export default class dybg {
     const s = this._states[this._states.length - 1];
     if (!s) return;
     s.mesh.setControlPoint(cx, cy, vals);
-    s.waveCp = null;
-    s.flatCp = null;
     if (!this._manual) s.mesh.updateMesh();
     this._requestTick();
   }
@@ -1962,16 +1731,7 @@ export default class dybg {
       this._randomizeLayout();
       this._recompose();
     }
-    if (!s) return;
-    const preset =
-      Math.random() > 0.8
-        ? this._genPreset(6, 6)
-        : _MGR_PRESETS[(Math.random() * _MGR_PRESETS.length) | 0];
-    s.mesh.resizeControlPoints(preset.width, preset.height);
-    this._applyPreset(s.mesh, preset);
-    s.waveCp = null;
-    s.flatCp = null;
-    this._requestTick();
+    if (s) this._requestTick();
   }
 
   enablePerformanceMonitor(enable) {
